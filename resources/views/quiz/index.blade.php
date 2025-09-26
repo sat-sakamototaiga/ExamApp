@@ -1,8 +1,4 @@
-@extends('layouts.app')
-
-@section('title', $exam->name . ' - 問題') {{-- ページタイトルに試験名を含める --}}
-
-@section('content')
+<x-app-layout>
     <div class="max-w-3xl mx-auto bg-white p-8 rounded-lg shadow-md">
         <h1 class="text-3xl font-bold mb-6 text-center text-blue-700">{{ $exam->name }}</h1> {{-- 試験名を表示 --}}
         <h2 class="text-2xl font-semibold mb-6 text-center text-gray-700">問題</h2>
@@ -51,4 +47,4 @@
             </a>
         </div>
     </div>
-@endsection
+</x-app-layout>

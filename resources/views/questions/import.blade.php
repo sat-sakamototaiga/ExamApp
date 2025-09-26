@@ -1,8 +1,4 @@
-@extends('layouts.app')
-
-@section('title', '問題インポート')
-
-@section('content')
+<x-app-layout>
     <div class="max-w-xl mx-auto bg-white p-6 rounded-lg shadow-md">
         <h1 class="text-3xl font-bold mb-6 text-center">問題インポート</h1>
 
@@ -68,4 +64,4 @@
             </div>
         </form>
     </div>
-@endsection
+</x-app-layout>

@@ -1,8 +1,4 @@
-@extends('layouts.app')
-
-@section('title', '試験を選択')
-
-@section('content')
+<x-app-layout>
     <div class="max-w-2xl mx-auto bg-white p-8 rounded-lg shadow-md">
         <h1 class="text-3xl font-bold mb-8 text-center text-blue-700">受験する試験を選択してください</h1>
 
@@ -43,4 +39,4 @@
             </a>
         </div>
     </div>
-@endsection
+</x-app-layout>

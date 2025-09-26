@@ -8,4 +8,11 @@ export default defineConfig({
             refresh: true,
         }),
     ],
+
+    server: {
+        host: '0.0.0.0', // すべてのネットワークインターフェースで待ち受ける
+        hmr: {
+            host: 'localhost', // ブラウザからはlocalhostとして接続
+        },
+    },
 });

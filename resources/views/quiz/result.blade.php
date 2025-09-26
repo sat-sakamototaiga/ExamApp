@@ -1,8 +1,4 @@
-@extends('layouts.app')
-
-@section('title', '解答結果')
-
-@section('content')
+<x-app-layout>
     <div class="max-w-3xl mx-auto bg-white p-8 rounded-lg shadow-md">
         <h1 class="text-3xl font-bold mb-6 text-center @if($is_correct) text-green-700 @else text-red-700 @endif">
             @if($is_correct)
@@ -69,4 +65,4 @@
             </a>
         </div>
     </div>
-@endsection
+</x-app-layout>

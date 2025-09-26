@@ -6,6 +6,7 @@ services:
       dockerfile: Dockerfile # 使用するDockerfile名
     ports:
       - "8000:80" # ホストの8000番ポートをコンテナの80番ポートにマッピング
+      - "5173:5173"
     volumes:
       - .:/var/www/html # 現在のディレクトリをコンテナのWebルートにマッピング
     depends_on:
