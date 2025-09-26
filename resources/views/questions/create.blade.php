@@ -73,7 +73,14 @@
                     </div>
                 </div>
             @endfor
-
+            {{-- フラグ設定 --}}
+            <div class="mb-4">
+                <label class="is_flagged" class="inline-flex items-center">
+                    <input type="checkbox" name="is_flagged" value="1" class="rounded border-gray-300 text-blue-600 shadow-sm focus:ring-indigo-500">
+                    <span class="ml-2 text-gray-600">要復習</span>
+                </label>
+            </div>
+            
             <div class="flex items-center justify-between mt-6">
                 <button type="submit" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">
                     登録

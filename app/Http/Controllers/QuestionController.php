@@ -10,23 +10,52 @@ use Illuminate\Support\Facades\DB; // トランザクションのために追加
 use Illuminate\Support\Facades\Log; // デバッグ用にLogファサードを追加
 use Exception; // Exceptionクラスをインポート
 
-class QuestionController extends Controller
-{
+class QuestionController extends Controller {
     /**
      * 問題一覧を表示
      */
-    public function index()
-    {
-        // 全ての問題を取得し、作成日時の新しい順に並べ替えて表示
-        $questions = Question::orderBy('id')->paginate(10); // ページネーションを追加
-        return view('questions.index', compact('questions'));
+    public function index(Request $request) {
+        // 現在の絞り込み条件を含んだURLをセッションに保存
+        session(['questions_index_url' => $request->fullUrl()]);
+
+        // 絞り込みフォーム用に、すべての試験を取得
+        $exams = Exam::orderBy('name')->get();
+        $selectedExamId = $request->input('exam_id');
+        $filter = $request->input('filter');
+    
+        // クエリビルダを初期化
+        $query = Question::query();
+    
+        // 選択された試験IDで絞り込み
+        if ($selectedExamId) {
+            $query->where('exam_id', $selectedExamId);
+
+            // フラグ付き問題でさらに絞り込み
+            if ($filter === 'flagged') {
+                $query->whereHas('flaggedByUsers', function ($q) {
+                    $q->where('user_id', auth()->id());
+                });
+            }
+        } else {
+            // 試験が選択されていない場合、何も表示しない
+            $query->whereRaw('1 = 0');
+        }
+
+        $questions = $query->orderBy('id')->paginate(10)->withQueryString();
+
+        // ★★★ ここから追加 ★★★
+        // ログイン中のユーザーがフラグを立てた問題のIDリストを取得
+        $flaggedQuestionIds = auth()->user()->flaggedQuestions()->pluck('questions.id');
+        // ★★★ ここまで追加 ★★★
+
+        // ★★★ compactに関数を追加 ★★★
+        return view('questions.index', compact('questions', 'exams', 'selectedExamId', 'filter', 'flaggedQuestionIds'));
     }
 
     /**
      * 新しい問題の作成フォームを表示
      */
-    public function create()
-    {
+    public function create() {
         $exams = Exam::orderBy('name')->get(); // 全ての試験を取得
         return view('questions.create', compact('exams'));
     }
@@ -34,9 +63,8 @@ class QuestionController extends Controller
     /**
      * 新しい問題をデータベースに保存
      */
-    public function store(Request $request)
-    {
-         // バリデーションルールを定義
+    public function store(Request $request) {
+        // バリデーションルールを定義
         $request->validate([
             'exam_id' => 'required|exists:exams,id',
             'question_text' => 'required|string|max:1000',
@@ -74,9 +102,14 @@ class QuestionController extends Controller
                 ]);
             }
 
+            //フラグのリレーションを更新
+            if ($request->has('is_flagged')) {
+                // ログインユーザーに紐づけてフラグを追加
+                auth()->user()->flaggedQuestions()->attach($question->id);
+            }
+
             DB::commit(); // 全ての処理が成功したらコミット
             return redirect()->route('questions.index')->with('success', '問題が正常に登録されました。');
-
         } catch (\Exception $e) {
             DB::rollBack(); // エラーが発生したらロールバック
             return back()->withInput()->with('error', '問題の登録中にエラーが発生しました: ' . $e->getMessage());
@@ -86,56 +119,53 @@ class QuestionController extends Controller
     /**
      * 特定の問題を表示 (今回は使わない可能性ありだが、ひな形として残す)
      */
-    public function show(Question $question)
-    {
+    public function show(Question $question) {
         return view('questions.show', compact('question'));
     }
 
     /**
      * 特定の問題の編集フォームを表示
      */
-    public function edit(Question $question)
-    {
+    public function edit(Question $question) {
         $exams = Exam::orderBy('name')->get(); // 全ての試験を取得
+
+        // 現在のユーザーがこの問題にフラグを立てているかどうかを確認
+        $isFlagged = auth()->user()->flaggedQuestions()->where('question_id', $question->id)->exists();
+
         // 関連するoptionsも自動的に取得されている
-        return view('questions.edit', compact('question', 'exams'));
+        return view('questions.edit', compact('question', 'exams', 'isFlagged'));
     }
 
     /**
      * 特定の問題をデータベースで更新
      */
-    public function update(Request $request, Question $question)
-    {
-         $request->validate([
-            'exam_id' => 'required|exists:exams,id', 
+    // app/Http/Controllers/QuestionController.php
+
+    public function update(Request $request, Question $question) {
+        // 1. 入力値のバリデーション
+        $request->validate([
+            'exam_id' => 'required|exists:exams,id',
             'question_text' => 'required|string|max:1000',
             'overall_explanation' => 'nullable|string',
-
-            'options.*.id' => 'nullable|integer|exists:options,id', // 既存選択肢のID
             'options.*.option_text' => 'required|string|max:255',
-            'options.*.is_correct' => 'nullable|boolean',
-            'options.*.option_explanation' => 'nullable|string',
-
-            'correct_options' => 'required|array|min:1', // 少なくとも1つの正解が選択されていること
-            'correct_options.*' => 'integer',
+            'correct_options' => 'required|array|min:1',
         ]);
 
-        DB::beginTransaction();
         try {
-            // 問題を更新
+            // 2. 問題の主要情報を更新 (これは正常に動作している部分)
             $question->update([
                 'exam_id' => $request->input('exam_id'),
                 'question_text' => $request->input('question_text'),
                 'overall_explanation' => $request->input('overall_explanation'),
             ]);
 
-            // 既存の選択肢を一度全て削除し、新しい選択肢で再作成する（シンプルにするため）
-            // より高度な更新は、既存の選択肢との比較ロジックが必要
+            // 3. 選択肢を更新 (これも正常に動作している部分)
             $question->options()->delete();
-
             foreach ($request->input('options') as $key => $option_data) {
+                if (empty($option_data['option_text'])) {
+                    continue;
+                }
                 $is_correct = isset($request->input('correct_options')[$key]);
-
                 $question->options()->create([
                     'option_text' => $option_data['option_text'],
                     'is_correct' => $is_correct,
@@ -143,11 +173,19 @@ class QuestionController extends Controller
                 ]);
             }
 
-            DB::commit();
-            return redirect()->route('questions.index')->with('success', '問題が正常に更新されました。');
+            // 4. フラグのリレーションを更新 (問題の核心部分)
+            if ($request->has('is_flagged')) {
+                // チェックがあれば、ログインユーザーと問題の間に紐付けを作成
+                auth()->user()->flaggedQuestions()->syncWithoutDetaching($question->id);
+            } else {
+                // チェックがなければ、紐付けを解除
+                auth()->user()->flaggedQuestions()->detach($question->id);
+            }
 
+            // 5. 成功時のメッセージと共に、絞り込み状態を保持した一覧へリダイレクト
+            return redirect(session('questions_index_url', route('questions.index')))->with('success', '問題が正常に更新されました。');
         } catch (\Exception $e) {
-            DB::rollBack();
+            // 6. 万が一エラーが発生した場合
             return back()->withInput()->with('error', '問題の更新中にエラーが発生しました: ' . $e->getMessage());
         }
     }
@@ -155,8 +193,7 @@ class QuestionController extends Controller
     /**
      * 特定の問題をデータベースから削除
      */
-    public function destroy(Question $question)
-    {
+    public function destroy(Question $question) {
         // 問題を削除
         $question->delete();
 
@@ -167,8 +204,7 @@ class QuestionController extends Controller
     /**
      * 問題インポートフォームを表示する
      */
-    public function importForm()
-    {
+    public function importForm() {
         $exam = \App\Models\Exam::orderBy('name')->get();
         return view('Questions.import', compact('exams'));
     }
@@ -179,8 +215,7 @@ class QuestionController extends Controller
      * @param \Illuminate\Http\Request $request
      * @return \Illuminate\Http\RedirectResponse
      */
-    public function import(Request $request)
-    {
+    public function import(Request $request) {
         // 1. アップロードされたファイルのバリデーション
         $request->validate([
             'csv_file' => 'required|file|mimes:csv,txt|max:2048', // 必須、ファイル形式はCSVまたはTXT、最大2MB
@@ -212,12 +247,12 @@ class QuestionController extends Controller
             '選択肢1', '正解1', '解説1',
             '選択肢2', '正解2', '解説2',
             '選択肢3', '正解3', '解説3',
-            '選択肢4', '正解4', '解説4'
+            '選択肢4', '正解4', '解説4',
         ];
 
         // 3. CSVヘッダーの整合性チェック (簡易的なもの)
         if (count($header) < count($expectedHeader) || array_diff($expectedHeader, $header)) {
-             return back()->with('error', 'CSVファイルのヘッダー形式が正しくありません。期待されるヘッダー: ' . implode(', ', $expectedHeader));
+            return back()->with('error', 'CSVファイルのヘッダー形式が正しくありません。期待されるヘッダー: ' . implode(', ', $expectedHeader));
         }
 
         $selectedExamId = $request->input('exam_id'); // 選択された試験IDを取得
@@ -282,11 +317,10 @@ class QuestionController extends Controller
 
                 $importedCount++; // 成功数をカウント
                 DB::commit(); // 全ての処理が成功したらコミット
-
             } catch (Exception $e) {
                 DB::rollBack(); // エラーが発生したらロールバック
                 $errorMessages[] = "{$lineNumber}行目: インポート中にエラーが発生しました - " . $e->getMessage();
-                Log::error("CSV Import Error on line {$lineNumber}: " . $e->getMessage() . " Data: " . json_encode($data));
+                Log::error("CSV Import Error on line {$lineNumber}: " . $e->getMessage() . ' Data: ' . json_encode($data));
             }
         }
 

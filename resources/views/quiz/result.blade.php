@@ -52,7 +52,15 @@
                 <p class="text-gray-600 italic mt-6">問題全体の解説はありません。</p>
             @endif
         </div>
-
+        {{-- フラグ管理 --}}
+        <div class="mt-6">
+        <form action="{{ route('questions.toggle_flag', $question) }}" method="POST">
+                @csrf
+                <button type="submit" class="bg-yellow-500 hover:bg-yellow-700 text-white font-bold py-2 px-4 rounded">
+                    この問題のフラグを更新
+                </button>
+            </form>
+        </div>
         <div class="flex justify-center space-x-4 mt-8">
             <a href="{{ route('quiz.index', $exam) }}" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-full text-lg shadow-md transition duration-300 ease-in-out transform hover:scale-105">
                 次の問題へ ({{ $exam->name }})

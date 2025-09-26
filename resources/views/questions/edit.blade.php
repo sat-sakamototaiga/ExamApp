@@ -2,13 +2,10 @@
     <div class="max-w-2xl mx-auto bg-white p-6 rounded-lg shadow-md">
         <h1 class="text-3xl font-bold mb-6 text-center">問題を編集</h1>
 
-        @if ($errors->any())
+        {{-- コントローラーからの汎用エラーメッセージ --}}
+        @if (session('error'))
             <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4" role="alert">
-                <ul>
-                    @foreach ($errors->all() as $error)
-                        <li>{{ $error }}</li>
-                    @endforeach
-                </ul>
+                <span class="block sm:inline">{{ session('error') }}</span>
             </div>
         @endif
 
@@ -16,6 +13,17 @@
             @csrf
             @method('PUT')
 
+            @if ($errors->any())
+                <div class="mb-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
+                    <strong class="font-bold">入力内容にエラーがあります。</strong>
+                    <ul>
+                        @foreach ($errors->all() as $error)
+                            <li>{{ $error }}</li>
+                        @endforeach
+                    </ul>
+                </div>
+            @endif
+            
             <div class="mb-4">
                 <label for="exam_id" class="block text-gray-700 text-sm font-bold mb-2">試験を選択:</label>
                 <select id="exam_id" name="exam_id" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline @error('exam_id') border-red-500 @enderror" required>
@@ -103,12 +111,21 @@
                     </div>
                 </div>
             @endfor
+            {{-- フラグ設定 --}}
+            <div class="mb-4">
+                <label for="is_flagged" class="inline-flex items-center">
+                    <input type="checkbox" name="is_flagged" id="is_flagged" value="1"
+                        {{ old('is_flagged', $isFlagged) ? 'checked' : '' }}
+                        class="rounded border-gray-300 text-indigo-600 shadow-sm focus:ring-indigo-500">
+                    <span class="ms-2 text-sm text-gray-600">要復習</span>
+                </label>
+            </div>
 
             <div class="flex items-center justify-between mt-6">
                 <button type="submit" class="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">
                     更新
                 </button>
-                <a href="{{ route('questions.index') }}" class="inline-block align-baseline font-bold text-sm text-blue-500 hover:text-blue-800">
+                <a href="{{ session('questions_index_url',route('questions.index')) }}" class="inline-block align-baseline font-bold text-sm text-blue-500 hover:text-blue-800">
                     一覧に戻る
                 </a>
             </div>
