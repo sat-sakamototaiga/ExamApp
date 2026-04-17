@@ -5,7 +5,10 @@ namespace App\Http\Controllers;
 use App\Models\Question; // Questionモデルをインポート
 use App\Models\Option; // Optionモデルをインポート
 use App\Models\Exam;
+use App\Models\User;
+use App\Support\CsvImportService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB; // トランザクションのために追加
 use Illuminate\Support\Facades\Log; // デバッグ用にLogファサードを追加
 use Exception; // Exceptionクラスをインポート
@@ -15,16 +18,24 @@ class QuestionController extends Controller {
      * 問題一覧を表示
      */
     public function index(Request $request) {
+        $this->authorizeQuestionManagement();
+
+        /** @var User $user */
+        $user = $request->user();
+
         // 現在の絞り込み条件を含んだURLをセッションに保存
         session(['questions_index_url' => $request->fullUrl()]);
 
-        // 絞り込みフォーム用に、すべての試験を取得
         $exams = Exam::orderBy('name')->get();
         $selectedExamId = $request->input('exam_id');
         $filter = $request->input('filter');
     
         // クエリビルダを初期化
         $query = Question::query();
+
+        if ($user->isTeacher()) {
+            $query->where('created_by', Auth::id());
+        }
     
         // 選択された試験IDで絞り込み
         if ($selectedExamId) {
@@ -33,7 +44,7 @@ class QuestionController extends Controller {
             // フラグ付き問題でさらに絞り込み
             if ($filter === 'flagged') {
                 $query->whereHas('flaggedByUsers', function ($q) {
-                    $q->where('user_id', auth()->id());
+                    $q->where('user_id', Auth::id());
                 });
             }
         } else {
@@ -45,7 +56,7 @@ class QuestionController extends Controller {
 
         // ★★★ ここから追加 ★★★
         // ログイン中のユーザーがフラグを立てた問題のIDリストを取得
-        $flaggedQuestionIds = auth()->user()->flaggedQuestions()->pluck('questions.id');
+        $flaggedQuestionIds = $user->flaggedQuestions()->pluck('questions.id');
         // ★★★ ここまで追加 ★★★
 
         // ★★★ compactに関数を追加 ★★★
@@ -56,6 +67,8 @@ class QuestionController extends Controller {
      * 新しい問題の作成フォームを表示
      */
     public function create() {
+        $this->authorizeQuestionManagement();
+
         $exams = Exam::orderBy('name')->get(); // 全ての試験を取得
         return view('questions.create', compact('exams'));
     }
@@ -64,6 +77,11 @@ class QuestionController extends Controller {
      * 新しい問題をデータベースに保存
      */
     public function store(Request $request) {
+        $this->authorizeQuestionManagement();
+
+        /** @var User $user */
+        $user = $request->user();
+
         // バリデーションルールを定義
         $request->validate([
             'exam_id' => 'required|exists:exams,id',
@@ -86,6 +104,7 @@ class QuestionController extends Controller {
             // 問題を作成
             $question = Question::create([
                 'exam_id' => $request->input('exam_id'),
+                'created_by' => $user->id,
                 'question_text' => $request->input('question_text'),
                 'overall_explanation' => $request->input('overall_explanation'),
             ]);
@@ -105,7 +124,7 @@ class QuestionController extends Controller {
             //フラグのリレーションを更新
             if ($request->has('is_flagged')) {
                 // ログインユーザーに紐づけてフラグを追加
-                auth()->user()->flaggedQuestions()->attach($question->id);
+                $user->flaggedQuestions()->attach($question->id);
             }
 
             DB::commit(); // 全ての処理が成功したらコミット
@@ -127,10 +146,16 @@ class QuestionController extends Controller {
      * 特定の問題の編集フォームを表示
      */
     public function edit(Question $question) {
+        $this->authorizeQuestionManagement();
+        $this->authorizeQuestionOwnership($question);
+
+        /** @var User $user */
+        $user = Auth::user();
+
         $exams = Exam::orderBy('name')->get(); // 全ての試験を取得
 
         // 現在のユーザーがこの問題にフラグを立てているかどうかを確認
-        $isFlagged = auth()->user()->flaggedQuestions()->where('question_id', $question->id)->exists();
+        $isFlagged = $user->flaggedQuestions()->where('question_id', $question->id)->exists();
 
         // 関連するoptionsも自動的に取得されている
         return view('questions.edit', compact('question', 'exams', 'isFlagged'));
@@ -142,6 +167,12 @@ class QuestionController extends Controller {
     // app/Http/Controllers/QuestionController.php
 
     public function update(Request $request, Question $question) {
+        $this->authorizeQuestionManagement();
+        $this->authorizeQuestionOwnership($question);
+
+        /** @var User $user */
+        $user = $request->user();
+
         // 1. 入力値のバリデーション
         $request->validate([
             'exam_id' => 'required|exists:exams,id',
@@ -176,10 +207,10 @@ class QuestionController extends Controller {
             // 4. フラグのリレーションを更新 (問題の核心部分)
             if ($request->has('is_flagged')) {
                 // チェックがあれば、ログインユーザーと問題の間に紐付けを作成
-                auth()->user()->flaggedQuestions()->syncWithoutDetaching($question->id);
+                $user->flaggedQuestions()->syncWithoutDetaching($question->id);
             } else {
                 // チェックがなければ、紐付けを解除
-                auth()->user()->flaggedQuestions()->detach($question->id);
+                $user->flaggedQuestions()->detach($question->id);
             }
 
             // 5. 成功時のメッセージと共に、絞り込み状態を保持した一覧へリダイレクト
@@ -194,6 +225,9 @@ class QuestionController extends Controller {
      * 特定の問題をデータベースから削除
      */
     public function destroy(Question $question) {
+        $this->authorizeQuestionManagement();
+        $this->authorizeQuestionOwnership($question);
+
         // 問題を削除
         $question->delete();
 
@@ -205,8 +239,36 @@ class QuestionController extends Controller {
      * 問題インポートフォームを表示する
      */
     public function importForm() {
-        $exam = \App\Models\Exam::orderBy('name')->get();
-        return view('Questions.import', compact('exams'));
+        $this->authorizeQuestionManagement();
+
+        $exams = Exam::orderBy('name')->get();
+        return view('questions.import', compact('exams'));
+    }
+
+    /**
+     * インポート用のCSVテンプレートをダウンロードする
+     */
+    public function downloadTemplate(CsvImportService $csvImportService) {
+        $this->authorizeQuestionManagement();
+
+        $header = [
+            '問題文', '全体解説',
+            '選択肢1', '正解1', '解説1',
+            '選択肢2', '正解2', '解説2',
+            '選択肢3', '正解3', '解説3',
+            '選択肢4', '正解4', '解説4',
+        ];
+
+        $sampleRow = [
+            'サンプル問題: 日本の首都はどこですか？',
+            '日本の首都は東京です。',
+            '東京', '1', '日本の首都は東京です。',
+            '大阪', '0', '大阪は首都ではありません。',
+            '名古屋', '0', '名古屋は首都ではありません。',
+            '福岡', '0', '福岡は首都ではありません。',
+        ];
+
+        return $csvImportService->streamTemplateDownload('questions_import_template.csv', $header, [$sampleRow]);
     }
     
     /**
@@ -215,26 +277,23 @@ class QuestionController extends Controller {
      * @param \Illuminate\Http\Request $request
      * @return \Illuminate\Http\RedirectResponse
      */
-    public function import(Request $request) {
+    public function import(Request $request, CsvImportService $csvImportService) {
+        $this->authorizeQuestionManagement();
+
         // 1. アップロードされたファイルのバリデーション
         $request->validate([
             'csv_file' => 'required|file|mimes:csv,txt|max:2048', // 必須、ファイル形式はCSVまたはTXT、最大2MB
             'exam_id' => 'required|exists:exams,id', // どの試験にインポートするか (追加)
         ]);
 
-        $file = $request->file('csv_file');
-        $filePath = $file->getRealPath(); // アップロードされたファイルの一時パス
-
-        // 2. CSVファイルの読み込みと文字コード変換
-        // Windowsで作成されたCSVはShift-JISの場合が多いのでUTF-8に変換
-        $csvData = file_get_contents($filePath);
-        if (!mb_check_encoding($csvData, 'UTF-8')) {
-            $csvData = mb_convert_encoding($csvData, 'UTF-8', 'SJIS-win');
+        try {
+            $reader = $csvImportService->createReaderFromUpload($request->file('csv_file'));
+        } catch (Exception $e) {
+            return back()->withInput()->withErrors([$e->getMessage()]);
         }
 
-        // 行ごとに分割し、ヘッダー行を取得
-        $lines = explode(PHP_EOL, $csvData);
-        $header = str_getcsv(array_shift($lines)); // 最初の行をヘッダーとして取得
+        $csvStream = $reader['stream'];
+        $header = $reader['header'];
 
         $importedCount = 0; // インポート成功数
         $errorMessages = []; // エラーメッセージを格納する配列
@@ -251,20 +310,22 @@ class QuestionController extends Controller {
         ];
 
         // 3. CSVヘッダーの整合性チェック (簡易的なもの)
-        if (count($header) < count($expectedHeader) || array_diff($expectedHeader, $header)) {
-            return back()->with('error', 'CSVファイルのヘッダー形式が正しくありません。期待されるヘッダー: ' . implode(', ', $expectedHeader));
+        if ($header !== $expectedHeader) {
+            fclose($csvStream);
+            return back()->withInput()->withErrors([
+                'CSVファイルのヘッダー形式が正しくありません。期待されるヘッダー: ' . implode(', ', $expectedHeader),
+            ]);
         }
 
         $selectedExamId = $request->input('exam_id'); // 選択された試験IDを取得
 
         // 4. 各行を処理してデータベースに挿入
-        foreach ($lines as $line) {
+        while (($row = fgetcsv($csvStream)) !== false) {
             $lineNumber++; // 行番号をインクリメント
-            if (trim($line) === '') {
+
+            if ($row === [null]) {
                 continue; // 空行はスキップ
             }
-
-            $row = str_getcsv($line); // CSVの行を配列に変換
 
             // 行の列数とヘッダーの列数が一致しない場合はエラー
             if (count($row) != count($header)) {
@@ -274,6 +335,12 @@ class QuestionController extends Controller {
 
             // ヘッダーと行データをキー・値のペアで関連付ける
             $data = array_combine($header, $row);
+            if ($data === false) {
+                $errorMessages[] = "{$lineNumber}行目: CSVデータの読み取りに失敗しました。";
+                continue;
+            }
+
+            $data = array_map(static fn($value) => is_string($value) ? trim($value) : $value, $data);
 
             // 問題文が空の場合はスキップ
             if (empty($data['問題文'])) {
@@ -287,6 +354,7 @@ class QuestionController extends Controller {
                 // 問題を作成
                 $question = Question::create([
                     'exam_id' => $selectedExamId, // 選択された試験IDを問題に紐付ける
+                    'created_by' => $request->user()->id,
                     'question_text' => $data['問題文'],
                     'overall_explanation' => $data['全体解説'] ?? null, // '全体解説'がなければnull
                 ]);
@@ -324,12 +392,40 @@ class QuestionController extends Controller {
             }
         }
 
+        fclose($csvStream);
+
         // 5. 結果メッセージの表示
         if (count($errorMessages) > 0) {
-            $message = "{$importedCount}件の問題をインポートしました。しかし、以下のエラーが発生しました:<br>" . implode('<br>', $errorMessages);
-            return back()->withInput()->with('error', $message); // エラーメッセージと入力データを戻す
+            if ($importedCount > 0) {
+                array_unshift($errorMessages, "{$importedCount}件の問題をインポートしましたが、一部の行でエラーが発生しました。");
+            }
+            return back()->withInput()->withErrors($errorMessages);
         } else {
             return back()->with('success', "{$importedCount}件の問題を正常にインポートしました。");
+        }
+    }
+
+    private function authorizeQuestionManagement(): void
+    {
+        /** @var User|null $user */
+        $user = Auth::user();
+
+        if (! $user?->hasRoleLevel(User::ROLE_TEACHER)) {
+            abort(403, 'この操作を実行する権限がありません。');
+        }
+    }
+
+    private function authorizeQuestionOwnership(Question $question): void
+    {
+        /** @var User|null $user */
+        $user = Auth::user();
+
+        if ($user?->isAdmin()) {
+            return;
+        }
+
+        if (! $user?->isTeacher() || $question->created_by !== $user->id) {
+            abort(403, '自分が作成した問題のみ操作できます。');
         }
     }
 }

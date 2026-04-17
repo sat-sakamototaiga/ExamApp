@@ -90,7 +90,11 @@ class QuizController extends Controller
         $is_correct = ($selected_option_ids_sorted == $correct_option_ids_sorted);
 
         // 選択肢ごとの情報を取得（表示用）
-        $question_options = Question::find($question_id)->options;
+        $question = Question::with('options')->find($question_id);
+        if (!$question) {
+            // 万が一問題が見つからない場合の保険
+            return redirect()->route('quiz.select_exam')->with('error', '問題が見つかりませんでした。再度お試しください。');
+        }
 
         // 結果ビューに渡すデータ
         $data = [
@@ -99,8 +103,9 @@ class QuizController extends Controller
             'correct_option_ids' => $correct_option_ids,
             'overall_explanation' => $overall_explanation,
             'option_explanations' => $option_explanations,
-            'question_options' => $question_options,
+            'question_options' => $question->options,
             'exam' => $exam, // 結果画面から次の問題へ進むために試験情報を渡す
+            'question' => $question, 
         ];
 
         // セッションをクリア（次の問題のために）

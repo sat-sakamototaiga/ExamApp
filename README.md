@@ -1,61 +1,97 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# StudyTestApp
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+StudyTestApp は、Laravel 12 をベースにした学習用テストアプリです。試験ごとの問題管理、受験、要復習フラグ、教師による担当生徒の進捗確認、管理者によるユーザー管理をまとめて扱います。
 
-## About Laravel
+詳細な機能整理は [docs/application_overview_ja.md](docs/application_overview_ja.md) を参照してください。
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+## 主な機能
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+- 試験管理: 試験一覧、作成、編集、削除
+- 試験管理の編集と削除は管理者のみ実行可能
+- 問題管理: 問題の作成、一覧、編集、削除
+- 問題管理では CSV インポートとテンプレートダウンロードに対応
+- 教師は自分が作成した問題のみ編集・削除可能
+- 受験機能: 試験を選んでランダムに 1 問出題
+- 受験機能は複数選択対応の完全一致採点
+- 結果画面で問題全体の解説と選択肢ごとの解説を表示
+- 要復習フラグ: 問題ごとのフラグ付けと解除
+- 問題一覧でフラグ付きのみ抽出可能
+- 教師機能: 担当生徒の正答率集計の閲覧とフィードバックコメント保存
+- 管理者機能: 教師・生徒ユーザーの個別登録、CSV 一括登録、教師と生徒の紐付け管理、全ユーザーの正答率一覧
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+## ロール
 
-## Learning Laravel
+- admin: 全機能にアクセス可能
+- admin は試験の編集・削除、ユーザー管理、教師生徒紐付け管理を担当
+- teacher: 問題管理、CSV インポート、受験機能を利用可能
+- teacher は自分が作成した問題だけ編集・削除可能
+- teacher は担当生徒の進捗とフィードバックを扱える
+- student: 受験、フラグ、プロフィール関連を利用可能
+- 新規登録ユーザーは既定で student
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+## 技術スタック
 
-You may also try the [Laravel Bootcamp](https://bootcamp.laravel.com), where you will be guided through building a modern Laravel application from scratch.
+- PHP 8.2 以上
+- Laravel 12
+- Blade
+- Tailwind CSS
+- Vite
+- Eloquent ORM
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+## セットアップ
 
-## Laravel Sponsors
+1. 依存関係をインストールします。
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+```bash
+composer install
+npm install
+```
 
-### Premium Partners
+1. 環境設定を作成します。
 
-- **[Vehikl](https://vehikl.com)**
-- **[Tighten Co.](https://tighten.co)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Redberry](https://redberry.international/laravel-development)**
-- **[Active Logic](https://activelogic.com)**
+```bash
+copy .env.example .env
+php artisan key:generate
+```
 
-## Contributing
+1. データベースを設定してマイグレーションを実行します。
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+```bash
+php artisan migrate
+```
 
-## Code of Conduct
+1. 管理者が必要なら作成します。
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+```bash
+php artisan admin:create-user "Admin User" "admin@example.com" --password=password123 --verified
+```
 
-## Security Vulnerabilities
+1. 開発サーバーを起動します。
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+```bash
+composer run dev
+```
 
-## License
+## 主なルート構成
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+- 認証不要: /
+- 認証必須: /dashboard, /profile, /quiz, /quiz/{exam}
+- teacher 以上: /questions, /questions/import, /exams, /teacher/students/progress
+- admin のみ: /admin/users, /admin/users/accuracy, /admin/teacher-students
+
+## 運用メモ
+
+- CLI で PHP 8.2 未満を使うと Composer の platform check により artisan 実行が失敗します。
+- admin:create-user は [routes/console.php](routes/console.php) に定義されています。
+- 試験結果集計画面は exam_results テーブルを参照しますが、現状の受験処理では exam_results への保存を行っていません。そのため、集計画面は別途データ投入しない限り空または 0 件ベースになります。
+- Dockerfile と docker-compose.yml は存在しますが、この README ではローカル開発手順を正としています。
+
+## テスト
+
+```bash
+composer test
+```
+
+## ドキュメント
+
+- [docs/application_overview_ja.md](docs/application_overview_ja.md)

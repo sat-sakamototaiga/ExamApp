@@ -1,13 +1,38 @@
 <x-app-layout>
+    @if (session('success'))
+        <div
+            x-data="{ show: true }"
+            x-init="setTimeout(() => show = false, 4000)"
+            x-show="show"
+            x-transition
+            class="fixed top-6 right-6 z-50 max-w-md w-full"
+            role="status"
+            aria-live="polite"
+        >
+            <div class="bg-green-100 border border-green-400 text-green-800 px-4 py-3 rounded-lg shadow-lg flex items-start justify-between gap-3">
+                <div>
+                    <p class="font-bold">インポート成功</p>
+                    <p class="text-sm">{{ session('success') }}</p>
+                </div>
+                <button type="button" @click="show = false" class="text-green-700 hover:text-green-900 font-bold" aria-label="閉じる">×</button>
+            </div>
+        </div>
+    @endif
+
     <div class="max-w-xl mx-auto bg-white p-6 rounded-lg shadow-md">
         <h1 class="text-3xl font-bold mb-6 text-center">問題インポート</h1>
+        <div class="mb-4 text-right">
+            <a href="{{ route('questions.index') }}" class="text-sm text-blue-600 hover:text-blue-800 font-semibold">
+                問題一覧へ戻る
+            </a>
+        </div>
 
         @if ($errors->any())
             <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4" role="alert">
                 <p class="font-bold">エラー:</p>
                 <ul>
                     @foreach ($errors->all() as $error)
-                        <li>{!! $error !!}</li> {{-- HTMLタグが含まれる可能性があるので{!! !!}を使用 --}}
+                        <li>{{ $error }}</li>
                     @endforeach
                 </ul>
             </div>
@@ -52,6 +77,11 @@
                     <strong class="text-red-600">※ `正解X` は `1` (正解) または `0` (不正解) で入力してください。</strong><br>
                     ※ `全体解説` および `解説X` は空欄でも構いません。
                 </p>
+                <div class="mt-3">
+                    <a href="{{ route('questions.import.template') }}" class="inline-flex items-center bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold py-2 px-4 rounded">
+                        CSVテンプレートをダウンロード
+                    </a>
+                </div>
                 <code class="block bg-gray-100 p-3 rounded-md text-gray-800 text-xs break-all mt-2">
                     問題文,全体解説,選択肢1,正解1,解説1,選択肢2,正解2,解説2,選択肢3,正解3,解説3,選択肢4,正解4,解説4
                 </code>

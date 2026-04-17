@@ -26,12 +26,16 @@
                                 <td class="py-2 px-4 border-b">{{ $exam->id }}</td>
                                 <td class="py-2 px-4 border-b">{{ $exam->name }}</td>
                                 <td class="py-2 px-4 border-b text-center whitespace-nowrap">
-                                    <a href="{{ route('exams.edit', $exam) }}" class="bg-yellow-500 hover:bg-yellow-700 text-white font-bold py-1 px-3 rounded text-sm mr-2">編集</a>
-                                    <form action="{{ route('exams.destroy', $exam) }}" method="POST" class="inline-block" onsubmit="return confirm('本当にこの試験を削除しますか？\nこの試験に紐づく全ての問題も削除されます。');">
-                                        @csrf
-                                        @method('DELETE')
-                                        <button type="submit" class="bg-red-500 hover:bg-red-700 text-white font-bold py-1 px-3 rounded text-sm">削除</button>
-                                    </form>
+                                    @if (auth()->user()->isAdmin())
+                                        <a href="{{ route('exams.edit', $exam) }}" class="bg-yellow-500 hover:bg-yellow-700 text-white font-bold py-1 px-3 rounded text-sm mr-2">編集</a>
+                                        <form action="{{ route('exams.destroy', $exam) }}" method="POST" class="inline-block" onsubmit="return confirm('本当にこの試験を削除しますか？\nこの試験に紐づく全ての問題も削除されます。');">
+                                            @csrf
+                                            @method('DELETE')
+                                            <button type="submit" class="bg-red-500 hover:bg-red-700 text-white font-bold py-1 px-3 rounded text-sm">削除</button>
+                                        </form>
+                                    @else
+                                        <span class="text-sm text-gray-500">閲覧のみ</span>
+                                    @endif
                                 </td>
                             </tr>
                         @endforeach

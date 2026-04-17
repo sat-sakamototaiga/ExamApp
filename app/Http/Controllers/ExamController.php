@@ -3,7 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Models\Exam; // Examモデルをインポート
+use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 
 class ExamController extends Controller
 {
@@ -52,6 +54,8 @@ class ExamController extends Controller
      */
     public function edit(Exam $exam)
     {
+        $this->authorizeExamMutation();
+
         return view('exams.edit', compact('exam'));
     }
 
@@ -60,6 +64,8 @@ class ExamController extends Controller
      */
     public function update(Request $request, Exam $exam)
     {
+        $this->authorizeExamMutation();
+
         $request->validate([
             'name' => 'required|string|max:255|unique:exams,name,' . $exam->id, // 更新時は自分自身のnameを除外
             'description' => 'nullable|string',
@@ -75,9 +81,21 @@ class ExamController extends Controller
      */
     public function destroy(Exam $exam)
     {
+        $this->authorizeExamMutation();
+
         // ExamモデルにquestionsリレーションのonDelete('cascade')設定があるため、関連する問題も自動的に削除される
         $exam->delete();
 
         return redirect()->route('exams.index')->with('success', '試験が正常に削除されました。');
+    }
+
+    private function authorizeExamMutation(): void
+    {
+        /** @var User|null $user */
+        $user = Auth::user();
+
+        if (! $user?->isAdmin()) {
+            abort(403, '試験の編集・削除は管理者のみ実行できます。');
+        }
     }
 }

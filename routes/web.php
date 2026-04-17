@@ -5,6 +5,8 @@ use App\Http\Controllers\QuestionController;
 use App\Http\Controllers\ExamController;
 use App\Http\Controllers\QuizController;
 use App\Http\Controllers\FlagController;
+use App\Http\Controllers\Admin\UserManagementController;
+use App\Http\Controllers\Teacher\StudentProgressController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -23,13 +25,35 @@ Route::middleware('auth')->group(function () {
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 
-    // 問題管理
-    Route::resource('questions', QuestionController::class);
-    Route::get('/questions/import', [QuestionController::class, 'importForm'])->name('questions.import.form');
-    Route::post('/questions/import', [QuestionController::class, 'import'])->name('questions.import');
+    // 問題・試験管理（教師以上）
+    Route::middleware('role.hierarchy:teacher')->group(function () {
+        Route::get('/questions/import', [QuestionController::class, 'importForm'])->name('questions.import.form');
+        Route::get('/questions/import/template', [QuestionController::class, 'downloadTemplate'])->name('questions.import.template');
+        Route::post('/questions/import', [QuestionController::class, 'import'])->name('questions.import');
+        Route::resource('questions', QuestionController::class)->whereNumber('question');
 
-    // 試験管理
-    Route::resource('exams', ExamController::class);
+        Route::resource('exams', ExamController::class);
+
+        // 教師機能（担当生徒の成績閲覧・FB）
+        Route::prefix('teacher')->name('teacher.')->group(function () {
+            Route::get('/students/progress', [StudentProgressController::class, 'index'])->name('students.progress');
+            Route::post('/students/feedback', [StudentProgressController::class, 'storeFeedback'])->name('students.feedback.store');
+        });
+    });
+
+    // 管理者機能
+    Route::middleware('role.hierarchy:admin')->prefix('admin')->name('admin.')->group(function () {
+        Route::get('/users', [UserManagementController::class, 'index'])->name('users.index');
+        Route::post('/users', [UserManagementController::class, 'store'])->name('users.store');
+        Route::get('/users/import/template', [UserManagementController::class, 'downloadImportTemplate'])->name('users.import.template');
+        Route::post('/users/import', [UserManagementController::class, 'import'])->name('users.import');
+        Route::get('/users/accuracy', [UserManagementController::class, 'accuracy'])->name('users.accuracy');
+
+        Route::get('/teacher-students', [UserManagementController::class, 'assignments'])->name('teacher-students.index');
+        Route::post('/teacher-students', [UserManagementController::class, 'storeAssignment'])->name('teacher-students.store');
+        Route::delete('/teacher-students/{teacher}/{student}', [UserManagementController::class, 'destroyAssignment'])
+            ->name('teacher-students.destroy');
+    });
 
     // 試験出題
     Route::get('/quiz', [QuizController::class, 'selectExam'])->name('quiz.select_exam');

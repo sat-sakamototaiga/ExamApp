@@ -7,6 +7,9 @@
             <a href="{{ route('questions.create') }}" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
                 新しい問題を作成
             </a>
+            <a href="{{ route('questions.import.form') }}" class="ml-4 bg-yellow-500 hover:bg-yellow-700 text-white font-bold py-2 px-4 rounded">
+                問題をインポート
+            </a>
             <a href="{{ route('exams.index') }}" class="ml-4 bg-purple-500 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded">
                 試験を管理
             </a>
