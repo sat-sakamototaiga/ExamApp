@@ -33,4 +33,20 @@
             </div>
         </div>
     </div>
+    @auth
+    <div class="py-12">
+        <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
+            <div class="text-left bg-white p-10 rounded-lg shadow-md">
+                <h5 class="text-3xl font-bold text-gray-800 mb-6">{{ Auth::user()->name }}さんの受験概要</h5>
+                <p class="text-lg text-gray-600 mb-8">
+                    このアプリで効率的に過去問題に取り組み、合格を目指しましょう。
+                    選択肢のランダム化や複数選択問題で、より実践的な学習が可能です。
+                </p>
+                <div class="space-x-4">
+
+                </div>
+            </div>
+        </div>
+    </div>
+    @endauth
 </x-app-layout>

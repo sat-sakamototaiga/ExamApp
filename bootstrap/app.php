@@ -13,6 +13,8 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias([
             'role.hierarchy' => \App\Http\Middleware\EnsureRoleHierarchy::class,
+            'quiz.reset.on.navigation' => \App\Http\Middleware\ResetQuizStateOnNavigation::class,
+            'quiz.prevent.random.navigation' => \App\Http\Middleware\PreventNavigationDuringRandomQuiz::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

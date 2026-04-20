@@ -17,14 +17,23 @@ use Exception;
 
 class UserManagementController extends Controller
 {
-    public function index(): View
+    public function index(Request $request): View
     {
+        $allowedRoles = [User::ROLE_ADMIN, User::ROLE_TEACHER, User::ROLE_STUDENT];
+        $selectedRole = $request->query('role', User::ROLE_ADMIN);
+
+        if (! in_array($selectedRole, $allowedRoles, true)) {
+            $selectedRole = User::ROLE_ADMIN;
+        }
+
         $users = User::query()
             ->withCount(['students', 'teachers'])
+            ->where('role', $selectedRole)
             ->orderBy('id')
-            ->paginate(20);
+            ->paginate(20)
+            ->withQueryString();
 
-        return view('admin.users', compact('users'));
+        return view('admin.users', compact('users', 'selectedRole'));
     }
 
     public function store(Request $request): RedirectResponse

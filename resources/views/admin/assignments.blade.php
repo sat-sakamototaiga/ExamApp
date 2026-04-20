@@ -51,23 +51,34 @@
         <div class="space-y-4">
             @forelse ($teachers as $teacher)
                 <div class="rounded border border-gray-200 p-4">
-                    <h2 class="mb-2 text-lg font-semibold">{{ $teacher->name }} ({{ $teacher->email }})</h2>
-                    @if ($teacher->students->isEmpty())
-                        <p class="text-sm text-gray-500">担当生徒は未設定です。</p>
-                    @else
-                        <ul class="space-y-2">
-                            @foreach ($teacher->students as $student)
-                                <li class="flex items-center justify-between rounded bg-gray-50 px-3 py-2">
-                                    <span>{{ $student->name }} ({{ $student->email }})</span>
-                                    <form action="{{ route('admin.teacher-students.destroy', ['teacher' => $teacher->id, 'student' => $student->id]) }}" method="POST" onsubmit="return confirm('この紐付けを解除しますか？');">
-                                        @csrf
-                                        @method('DELETE')
-                                        <button type="submit" class="rounded bg-red-600 px-3 py-1 text-sm text-white hover:bg-red-700">解除</button>
-                                    </form>
-                                </li>
-                            @endforeach
-                        </ul>
-                    @endif
+                    <details {{ (string) old('teacher_id') === (string) $teacher->id ? 'open' : '' }}>
+                        <summary class="flex cursor-pointer list-none items-center justify-between gap-3 rounded px-2 py-1 hover:bg-gray-50">
+                            <div>
+                                <h2 class="text-lg font-semibold">{{ $teacher->name }} ({{ $teacher->email }})</h2>
+                                <p class="text-sm text-gray-500">担当生徒数: {{ $teacher->students->count() }}人</p>
+                            </div>
+                            <span class="text-sm font-medium text-gray-500">開閉</span>
+                        </summary>
+
+                        <div class="mt-3 border-t border-gray-100 pt-3">
+                            @if ($teacher->students->isEmpty())
+                                <p class="text-sm text-gray-500">担当生徒は未設定です。</p>
+                            @else
+                                <ul class="space-y-2">
+                                    @foreach ($teacher->students as $student)
+                                        <li class="flex items-center justify-between rounded bg-gray-50 px-3 py-2">
+                                            <span>{{ $student->name }} ({{ $student->email }})</span>
+                                            <form action="{{ route('admin.teacher-students.destroy', ['teacher' => $teacher->id, 'student' => $student->id]) }}" method="POST" onsubmit="return confirm('この紐付けを解除しますか？');">
+                                                @csrf
+                                                @method('DELETE')
+                                                <button type="submit" class="rounded bg-red-600 px-3 py-1 text-sm text-white hover:bg-red-700">解除</button>
+                                            </form>
+                                        </li>
+                                    @endforeach
+                                </ul>
+                            @endif
+                        </div>
+                    </details>
                 </div>
             @empty
                 <p class="text-gray-500">教師ユーザーが存在しません。</p>

@@ -15,7 +15,7 @@ Route::get('/', function () {
 
 Route::get('/test', function () { return 'Test page is working!'; });
 
-Route::middleware('auth')->group(function () {
+Route::middleware(['auth', 'quiz.prevent.random.navigation', 'quiz.reset.on.navigation'])->group(function () {
 
     Route::get('/dashboard', function () {
         return view('dashboard');
@@ -57,7 +57,9 @@ Route::middleware('auth')->group(function () {
 
     // 試験出題
     Route::get('/quiz', [QuizController::class, 'selectExam'])->name('quiz.select_exam');
+    Route::get('/quiz/{exam}/resume', [QuizController::class, 'resume'])->name('quiz.resume');
     Route::get('/quiz/{exam}', [QuizController::class, 'index'])->name('quiz.index');
+    Route::post('/quiz/{exam}/next', [QuizController::class, 'next'])->name('quiz.next');
     Route::post('/quiz/{exam}/answer', [QuizController::class, 'answer'])->name('quiz.answer');
 
     // フラグ管理

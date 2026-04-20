@@ -1,12 +1,28 @@
 <x-app-layout>
     <div class="max-w-3xl mx-auto bg-white p-8 rounded-lg shadow-md">
-        <h1 class="text-3xl font-bold mb-6 text-center @if($is_correct) text-green-700 @else text-red-700 @endif">
+        @php
+            $modeLabel = match ($quiz_mode ?? 'normal') {
+                'flagged' => 'フラグ付きモード',
+                'random_count' => '指定数ランダム出題モード',
+                default => '通常モード',
+            };
+        @endphp
+
+        <h1 class="text-3xl font-bold mb-2 text-center @if($is_correct) text-green-700 @else text-red-700 @endif">
             @if($is_correct)
                 正解！
             @else
                 不正解...
             @endif
         </h1>
+        <p class="text-center text-sm text-gray-600 mb-1">{{ $modeLabel }}</p>
+        <p class="text-center text-sm text-gray-600 mb-6">正解済み {{ $progress_correct }} / {{ $progress_total }} ・ 残り {{ $remaining_count }}</p>
+
+        @if ($is_finished)
+            <div class="mb-6 bg-green-100 border border-green-400 text-green-800 px-4 py-3 rounded">
+                全ての問題に正解したため、出題を終了しました。
+            </div>
+        @endif
 
         <div class="mb-6">
             <p class="text-lg font-semibold mb-4">選択肢の詳細と解説:</p>
@@ -52,25 +68,35 @@
                 <p class="text-gray-600 italic mt-6">問題全体の解説はありません。</p>
             @endif
         </div>
-        {{-- フラグ管理 --}}
+
         <div class="mt-6">
-        <form action="{{ route('questions.toggle_flag', $question) }}" method="POST">
+            <form action="{{ route('questions.toggle_flag', $question) }}" method="POST">
                 @csrf
                 <button type="submit" class="bg-yellow-500 hover:bg-yellow-700 text-white font-bold py-2 px-4 rounded">
                     この問題のフラグを更新
                 </button>
             </form>
         </div>
+
         <div class="flex justify-center space-x-4 mt-8">
-            <a href="{{ route('quiz.index', $exam) }}" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-full text-lg shadow-md transition duration-300 ease-in-out transform hover:scale-105">
-                次の問題へ ({{ $exam->name }})
-            </a>
+            @if (!$is_finished)
+                <form action="{{ route('quiz.next', $exam) }}" method="POST">
+                    @csrf
+                    <button type="submit" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-full text-lg shadow-md transition duration-300 ease-in-out transform hover:scale-105">
+                        次の問題へ ({{ $exam->name }})
+                    </button>
+                </form>
+            @endif
+
             <a href="{{ route('quiz.select_exam') }}" class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-6 rounded-full text-lg shadow-md transition duration-300 ease-in-out transform hover:scale-105">
                 他の試験を選択
             </a>
-            <a href="{{ route('questions.index') }}" class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-6 rounded-full text-lg shadow-md transition duration-300 ease-in-out transform hover:scale-105">
-                問題管理画面へ
-            </a>
+
+            @if (($quiz_mode ?? 'normal') !== 'random_count')
+                <a href="{{ route('questions.index') }}" class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-6 rounded-full text-lg shadow-md transition duration-300 ease-in-out transform hover:scale-105">
+                    問題管理画面へ
+                </a>
+            @endif
         </div>
     </div>
 </x-app-layout>

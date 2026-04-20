@@ -1,7 +1,24 @@
 <x-app-layout>
     <div class="max-w-3xl mx-auto bg-white p-8 rounded-lg shadow-md">
         <h1 class="text-3xl font-bold mb-6 text-center text-blue-700">{{ $exam->name }}</h1> {{-- 試験名を表示 --}}
-        <h2 class="text-2xl font-semibold mb-6 text-center text-gray-700">問題</h2>
+        <h2 class="text-2xl font-semibold mb-2 text-center text-gray-700">問題</h2>
+
+        @php
+            $modeLabel = match ($quiz_mode ?? 'normal') {
+                'flagged' => 'フラグ付きモード',
+                'random_count' => '指定数ランダム出題モード',
+                default => '通常モード',
+            };
+        @endphp
+
+        <p class="text-center text-sm text-gray-600 mb-1">{{ $modeLabel }}</p>
+        <p class="text-center text-sm text-gray-600 mb-6">正解済み {{ $progress_correct }} / {{ $progress_total }} ・ 残り {{ $remaining_count }}</p>
+
+        @if (session('error'))
+            <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4" role="alert">
+                <span class="block sm:inline">{{ session('error') }}</span>
+            </div>
+        @endif
 
         @if ($question)
             <div class="mb-8">
@@ -9,7 +26,7 @@
                 <p class="text-xl leading-relaxed bg-blue-50 p-4 rounded-md border border-blue-200">{!! nl2br(e($question->question_text)) !!}</p>
             </div>
 
-            <form action="{{ route('quiz.answer', $exam) }}" method="POST"> {{-- route('quiz.answer', $exam) に変更 --}}
+            <form action="{{ route('quiz.answer', $exam) }}" method="POST">
                 @csrf
                 <input type="hidden" name="question_id" value="{{ $question->id }}">
 
@@ -41,10 +58,13 @@
             <a href="{{ route('quiz.select_exam') }}" class="text-blue-500 hover:text-blue-800 text-sm">
                 他の試験を選択する
             </a>
-            <span class="text-gray-400 mx-2">|</span>
-            <a href="{{ route('questions.index') }}" class="text-blue-500 hover:text-blue-800 text-sm">
-                問題管理画面へ戻る
-            </a>
+
+            @if (($quiz_mode ?? 'normal') !== 'random_count')
+                <span class="text-gray-400 mx-2">|</span>
+                <a href="{{ route('questions.index') }}" class="text-blue-500 hover:text-blue-800 text-sm">
+                    問題管理画面へ戻る
+                </a>
+            @endif
         </div>
     </div>
 </x-app-layout>
