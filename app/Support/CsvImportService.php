@@ -24,10 +24,12 @@ class CsvImportService
             throw new RuntimeException('CSVファイルの読み込みに失敗しました。');
         }
 
+        // 取り込み側はUTF-8前提のため、Shift_JIS系で来たCSVもここで正規化する。
         if (! mb_check_encoding($csvData, 'UTF-8')) {
             $csvData = mb_convert_encoding($csvData, 'UTF-8', 'SJIS-win,CP932,UTF-8');
         }
 
+        // ヘッダー一致判定を安定させるため、UTF-8 BOMを除去する。
         if (str_starts_with($csvData, "\xEF\xBB\xBF")) {
             $csvData = substr($csvData, 3);
         }
@@ -64,6 +66,7 @@ class CsvImportService
                 return;
             }
 
+            // Excel互換性のため、テンプレートはBOM付きUTF-8で配信する。
             fwrite($output, "\xEF\xBB\xBF");
             fputcsv($output, $header);
 

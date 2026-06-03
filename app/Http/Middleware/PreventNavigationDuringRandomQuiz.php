@@ -27,6 +27,7 @@ class PreventNavigationDuringRandomQuiz
             return $next($request);
         }
 
+        // クイズ進行中でも必要な最小限の操作は許可する。
         if (in_array($routeName, ['questions.toggle_flag', 'logout'], true)) {
             return $next($request);
         }
@@ -37,6 +38,7 @@ class PreventNavigationDuringRandomQuiz
             return $next($request);
         }
 
+        // 不要な画面遷移を抑止し、必ず現在のクイズ画面へ戻す。
         return redirect()
             ->route('quiz.resume', ['exam' => $examId])
             ->with('error', '指定数ランダム出題モード中は、リロード以外の画面遷移はできません。');

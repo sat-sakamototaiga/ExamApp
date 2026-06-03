@@ -45,6 +45,7 @@ class QuizController extends Controller
         $mode = $validated['mode'] ?? self::MODE_NORMAL;
         $requestedCount = (int) ($validated['count'] ?? 10);
 
+        // 出題モードごとに最初の問題プールを組み立てる。
         $poolQuestionIds = $this->buildPoolQuestionIds($exam, $mode, $requestedCount, $request->user());
 
         if (empty($poolQuestionIds)) {
@@ -60,6 +61,7 @@ class QuizController extends Controller
             ? min($requestedCount, count($poolQuestionIds))
             : count($poolQuestionIds);
 
+        // quiz_state は出題継続・再表示・遷移制御を一元管理するセッション状態。
         $state = [
             'exam_id' => $exam->id,
             'mode' => $mode,
@@ -220,6 +222,7 @@ class QuizController extends Controller
             return [];
         }
 
+        // ランダム指定数モードでは、ここで初回プールのサイズを確定する。
         $limit = min($requestedCount, count($allIds));
 
         return collect($allIds)->shuffle()->take($limit)->values()->toArray();
@@ -301,6 +304,7 @@ class QuizController extends Controller
         $poolIds = array_map('intval', $state['pool_question_ids'] ?? []);
         $solvedIds = array_map('intval', $state['solved_question_ids'] ?? []);
 
+        // 正解済みIDを除外した残問題IDを毎回算出することで、途中状態の整合性を保つ。
         return array_values(array_diff($poolIds, $solvedIds));
     }
 
