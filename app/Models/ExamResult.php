@@ -12,6 +12,8 @@ class ExamResult extends Model
         'exam_id',
         'score',
         'question_count',
+        'points_earned',
+        'bonus_points',
     ];
 
     public function user(): BelongsTo

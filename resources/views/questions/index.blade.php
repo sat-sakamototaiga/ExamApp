@@ -62,6 +62,7 @@
                             <tr>
                                 <th class="py-2 px-4 border-b text-left w-24">問題番号</th>
                                 <th class="py-2 px-4 border-b text-left">試験名</th>
+                                <th class="py-2 px-4 border-b text-left">難易度</th>
                                 <th class="py-2 px-4 border-b text-left">問題文</th>
                                 <th class="py-2 px-4 border-b text-center" title="フラグ">⭐</th>
                                 <th class="py-2 px-4 border-b text-center">操作</th>
@@ -72,6 +73,16 @@
                                 <tr>
                                     <td class="py-2 px-4 border-b">{{ ($questions->currentPage() - 1) * $questions->perPage() + $loop->iteration }}</td>
                                     <td class="py-2 px-4 border-b">{{ $question->exam->name ?? 'N/A' }}</td>
+                                    <td class="py-2 px-4 border-b">
+                                        @php
+                                            $difficultyLabel = match ($question->difficulty ?? 'normal') {
+                                                'easy' => 'Easy (1pt)',
+                                                'expert' => 'Expert (5pt)',
+                                                default => 'Normal (3pt)',
+                                            };
+                                        @endphp
+                                        {{ $difficultyLabel }}
+                                    </td>
                                     <td class="py-2 px-4 border-b max-w-xs overflow-hidden text-ellipsis whitespace-nowrap">{!! nl2br(e(Str::limit($question->question_text, 50))) !!}</td>
                                     
                                     {{-- ★★★ ここから変更 ★★★ --}}

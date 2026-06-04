@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Teacher;
 
 use App\Http\Controllers\Controller;
+use App\Models\PointResetSetting;
 use App\Models\TeacherFeedbackComment;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
@@ -15,6 +16,9 @@ class StudentProgressController extends Controller
     public function index(Request $request): View
     {
         $teacher = $request->user();
+        $this->applyAutomaticPointResetIfDue($teacher);
+
+        $pointResetSetting = PointResetSetting::query()->first();
 
         $assignedStudentIds = $teacher->students()->pluck('users.id');
 
@@ -25,10 +29,11 @@ class StudentProgressController extends Controller
                 'users.id',
                 'users.name',
                 'users.email',
+                'users.total_points',
                 DB::raw('COALESCE(SUM(exam_results.score), 0) as total_score'),
                 DB::raw('COALESCE(SUM(exam_results.question_count), 0) as total_questions')
             )
-            ->groupBy('users.id', 'users.name', 'users.email')
+            ->groupBy('users.id', 'users.name', 'users.email', 'users.total_points')
             ->orderBy('users.name')
             ->get();
 
@@ -47,7 +52,50 @@ class StudentProgressController extends Controller
             ->latest()
             ->get();
 
-        return view('teacher.student-progress', compact('students', 'feedbackByStudent'));
+        return view('teacher.student-progress', compact('students', 'feedbackByStudent', 'pointResetSetting'));
+    }
+
+    public function updatePointResetInterval(Request $request): RedirectResponse
+    {
+        $teacher = $request->user();
+
+        $validated = $request->validate([
+            'reset_interval_days' => 'nullable|integer|min:1|max:365',
+        ]);
+
+        $setting = PointResetSetting::query()->first() ?? new PointResetSetting();
+        $setting->reset_interval_days = $validated['reset_interval_days'] ?? null;
+        $setting->updated_by = $teacher->id;
+
+        if ($setting->last_reset_at === null && $setting->reset_interval_days !== null) {
+            $setting->last_reset_at = now();
+        }
+
+        $setting->save();
+
+        return back()->with('success', 'ポイント自動リセット間隔を更新しました。');
+    }
+
+    public function resetAllStudentPoints(Request $request): RedirectResponse
+    {
+        $teacher = $request->user();
+
+        DB::transaction(function () use ($teacher) {
+            User::query()
+                ->where('role', User::ROLE_STUDENT)
+                ->update([
+                    'total_points' => 0,
+                    'points_reset_at' => now(),
+                    'updated_at' => now(),
+                ]);
+
+            $setting = PointResetSetting::query()->first() ?? new PointResetSetting();
+            $setting->last_reset_at = now();
+            $setting->updated_by = $teacher->id;
+            $setting->save();
+        });
+
+        return back()->with('success', '全生徒のポイントをリセットしました。');
     }
 
     public function storeFeedback(Request $request): RedirectResponse
@@ -71,5 +119,42 @@ class StudentProgressController extends Controller
         ]);
 
         return back()->with('success', 'フィードバックコメントを保存しました。');
+    }
+
+    private function applyAutomaticPointResetIfDue(User $teacher): void
+    {
+        $setting = PointResetSetting::query()->first();
+
+        if (! $setting || $setting->reset_interval_days === null) {
+            return;
+        }
+
+        if ($setting->last_reset_at === null) {
+            $setting->last_reset_at = now();
+            $setting->updated_by = $teacher->id;
+            $setting->save();
+
+            return;
+        }
+
+        $nextResetAt = $setting->last_reset_at->copy()->addDays((int) $setting->reset_interval_days);
+
+        if (now()->lt($nextResetAt)) {
+            return;
+        }
+
+        DB::transaction(function () use ($setting, $teacher) {
+            User::query()
+                ->where('role', User::ROLE_STUDENT)
+                ->update([
+                    'total_points' => 0,
+                    'points_reset_at' => now(),
+                    'updated_at' => now(),
+                ]);
+
+            $setting->last_reset_at = now();
+            $setting->updated_by = $teacher->id;
+            $setting->save();
+        });
     }
 }

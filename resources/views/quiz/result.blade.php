@@ -18,6 +18,15 @@
         <p class="text-center text-sm text-gray-600 mb-1">{{ $modeLabel }}</p>
         <p class="text-center text-sm text-gray-600 mb-6">正解済み {{ $progress_correct }} / {{ $progress_total }} ・ 残り {{ $remaining_count }}</p>
 
+        @if ($is_correct)
+            <div class="mb-6 rounded border border-blue-300 bg-blue-50 px-4 py-3 text-blue-800">
+                今回の正解で <strong>{{ $awarded_question_points ?? 0 }}pt</strong> を獲得しました。
+                @if (($awarded_bonus_points ?? 0) > 0)
+                    全問正解ボーナスとして <strong>{{ $awarded_bonus_points }}pt</strong> を追加しました。
+                @endif
+            </div>
+        @endif
+
         @if ($is_finished)
             <div class="mb-6 bg-green-100 border border-green-400 text-green-800 px-4 py-3 rounded">
                 全ての問題に正解したため、出題を終了しました。

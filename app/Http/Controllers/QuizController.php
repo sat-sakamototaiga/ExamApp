@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Question;
 use App\Models\Exam;
+use App\Models\ExamResult;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Session;
@@ -14,6 +15,13 @@ class QuizController extends Controller
     private const MODE_NORMAL = 'normal';
     private const MODE_FLAGGED = 'flagged';
     private const MODE_RANDOM_COUNT = 'random_count';
+    private const PERFECT_BONUS_POINTS = 10;
+
+    private const DIFFICULTY_POINTS = [
+        Question::DIFFICULTY_EASY => 1,
+        Question::DIFFICULTY_NORMAL => 3,
+        Question::DIFFICULTY_EXPERT => 5,
+    ];
 
     /**
      * 試験選択画面を表示
@@ -147,17 +155,35 @@ class QuizController extends Controller
             return redirect()->route('quiz.select_exam')->with('error', '問題または試験の整合性エラーが発生しました。再度お試しください。');
         }
 
+        // 選択肢ごとの情報を取得（表示・ポイント計算用）
+        $question = Question::with('options')
+            ->where('exam_id', $exam->id)
+            ->find($question_id);
+
+        if (!$question) {
+            return redirect()->route('quiz.select_exam')->with('error', '問題が見つかりませんでした。再度お試しください。');
+        }
+
         // 正誤判定ロジック
         $selected_option_ids_sorted = collect($selected_option_ids)->sort()->values()->toArray();
         $correct_option_ids_sorted = collect($correct_option_ids)->sort()->values()->toArray();
 
         $is_correct = ($selected_option_ids_sorted == $correct_option_ids_sorted);
+        $wasAlreadySolved = in_array((int) $question_id, array_map('intval', $state['solved_question_ids'] ?? []), true);
 
-        if ($is_correct) {
+        $awardedQuestionPoints = 0;
+
+        if ($is_correct && !$wasAlreadySolved) {
             $state['solved_question_ids'] = array_values(array_unique([
                 ...($state['solved_question_ids'] ?? []),
                 (int) $question_id,
             ]));
+
+            $awardedQuestionPoints = $this->resolvePointsForDifficulty((string) $question->difficulty);
+
+            if ($request->user()?->isStudent() && $awardedQuestionPoints > 0) {
+                $request->user()->increment('total_points', $awardedQuestionPoints);
+            }
         }
 
         // 連続同一問題を防ぐため、直前問題を記録
@@ -168,20 +194,34 @@ class QuizController extends Controller
         $state['option_explanations'] = [];
         Session::put(self::QUIZ_STATE_KEY, $state);
 
-        // 選択肢ごとの情報を取得（表示用）
-        $question = Question::with('options')->find($question_id);
-        if (!$question) {
-            // 万が一問題が見つからない場合の保険
-            return redirect()->route('quiz.select_exam')->with('error', '問題が見つかりませんでした。再度お試しください。');
-        }
-
         // 結果ビューに渡すデータ
         $remainingCount = $this->remainingQuestionCount($state);
         $isFinished = $remainingCount === 0;
+        $bonusPointsAwarded = 0;
+
+        if ($isFinished && $is_correct) {
+            $basePoints = $this->resolveTotalPointsForQuestions($state['pool_question_ids'] ?? []);
+            $bonusPointsAwarded = self::PERFECT_BONUS_POINTS;
+
+            if ($request->user()?->isStudent()) {
+                $request->user()->increment('total_points', $bonusPointsAwarded);
+            }
+
+            ExamResult::create([
+                'user_id' => $request->user()->id,
+                'exam_id' => $exam->id,
+                'score' => count($state['solved_question_ids'] ?? []),
+                'question_count' => count($state['pool_question_ids'] ?? []),
+                'points_earned' => $basePoints + $bonusPointsAwarded,
+                'bonus_points' => $bonusPointsAwarded,
+            ]);
+        }
 
         $data = [
             'is_correct' => $is_correct,
             'is_finished' => $isFinished,
+            'awarded_question_points' => $awardedQuestionPoints,
+            'awarded_bonus_points' => $bonusPointsAwarded,
             'remaining_count' => $remainingCount,
             'progress_total' => count($state['pool_question_ids'] ?? []),
             'progress_correct' => count($state['solved_question_ids'] ?? []),
@@ -196,6 +236,26 @@ class QuizController extends Controller
         ];
 
         return view('quiz.result', $data);
+    }
+
+    private function resolvePointsForDifficulty(string $difficulty): int
+    {
+        return self::DIFFICULTY_POINTS[$difficulty] ?? self::DIFFICULTY_POINTS[Question::DIFFICULTY_NORMAL];
+    }
+
+    private function resolveTotalPointsForQuestions(array $questionIds): int
+    {
+        if (empty($questionIds)) {
+            return 0;
+        }
+
+        $difficulties = Question::query()
+            ->whereIn('id', array_map('intval', $questionIds))
+            ->pluck('difficulty');
+
+        return $difficulties
+            ->map(fn ($difficulty) => $this->resolvePointsForDifficulty((string) $difficulty))
+            ->sum();
     }
 
     private function buildPoolQuestionIds(Exam $exam, string $mode, int $requestedCount, ?User $user): array

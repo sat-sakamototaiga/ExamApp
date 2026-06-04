@@ -11,6 +11,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB; // トランザクションのために追加
 use Illuminate\Support\Facades\Log; // デバッグ用にLogファサードを追加
+use Illuminate\Validation\Rule;
 use Exception; // Exceptionクラスをインポート
 
 class QuestionController extends Controller {
@@ -86,6 +87,7 @@ class QuestionController extends Controller {
         $request->validate([
             'exam_id' => 'required|exists:exams,id',
             'question_text' => 'required|string|max:1000',
+            'difficulty' => ['required', Rule::in(Question::DIFFICULTIES)],
             'overall_explanation' => 'nullable|string', // 変更
 
             // 選択肢のバリデーション (少なくとも2つは必要など、要件に応じて調整)
@@ -106,6 +108,7 @@ class QuestionController extends Controller {
                 'exam_id' => $request->input('exam_id'),
                 'created_by' => $user->id,
                 'question_text' => $request->input('question_text'),
+                'difficulty' => $request->input('difficulty'),
                 'overall_explanation' => $request->input('overall_explanation'),
             ]);
 
@@ -177,6 +180,7 @@ class QuestionController extends Controller {
         $request->validate([
             'exam_id' => 'required|exists:exams,id',
             'question_text' => 'required|string|max:1000',
+            'difficulty' => ['required', Rule::in(Question::DIFFICULTIES)],
             'overall_explanation' => 'nullable|string',
             'options.*.option_text' => 'required|string|max:255',
             'correct_options' => 'required|array|min:1',
@@ -187,6 +191,7 @@ class QuestionController extends Controller {
             $question->update([
                 'exam_id' => $request->input('exam_id'),
                 'question_text' => $request->input('question_text'),
+                'difficulty' => $request->input('difficulty'),
                 'overall_explanation' => $request->input('overall_explanation'),
             ]);
 
@@ -356,6 +361,7 @@ class QuestionController extends Controller {
                     'exam_id' => $selectedExamId, // 選択された試験IDを問題に紐付ける
                     'created_by' => $request->user()->id,
                     'question_text' => $data['問題文'],
+                    'difficulty' => Question::DIFFICULTY_NORMAL,
                     'overall_explanation' => $data['全体解説'] ?? null, // '全体解説'がなければnull
                 ]);
 

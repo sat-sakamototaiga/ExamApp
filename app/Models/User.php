@@ -32,6 +32,8 @@ class User extends Authenticatable {
         'name',
         'email',
         'role',
+        'total_points',
+        'points_reset_at',
         'password',
     ];
 
@@ -53,6 +55,7 @@ class User extends Authenticatable {
     protected function casts(): array {
         return [
             'email_verified_at' => 'datetime',
+            'points_reset_at' => 'datetime',
             'password' => 'hashed',
         ];
     }
