@@ -32,7 +32,7 @@ class QuestionController extends Controller {
         $filter = $request->input('filter');
     
         // クエリビルダを初期化
-        $query = Question::query();
+        $query = Question::query()->with('exam:id,name');
 
         if ($user->isTeacher()) {
             $query->where('created_by', Auth::id());
@@ -55,10 +55,13 @@ class QuestionController extends Controller {
 
         $questions = $query->orderBy('id')->paginate(10)->withQueryString();
 
-        // ★★★ ここから追加 ★★★
-        // ログイン中のユーザーがフラグを立てた問題のIDリストを取得
-        $flaggedQuestionIds = $user->flaggedQuestions()->pluck('questions.id');
-        // ★★★ ここまで追加 ★★★
+        // 表示中の問題だけを対象にフラグIDを取得して、不要な全件取得を避ける。
+        $displayedQuestionIds = $questions->getCollection()->pluck('id');
+        $flaggedQuestionIds = $displayedQuestionIds->isEmpty()
+            ? collect()
+            : $user->flaggedQuestions()
+                ->whereIn('questions.id', $displayedQuestionIds)
+                ->pluck('questions.id');
 
         // ★★★ compactに関数を追加 ★★★
         return view('questions.index', compact('questions', 'exams', 'selectedExamId', 'filter', 'flaggedQuestionIds'));

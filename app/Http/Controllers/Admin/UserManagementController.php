@@ -169,17 +169,26 @@ class UserManagementController extends Controller
 
     public function accuracy(): View
     {
+        $resultSummary = DB::table('exam_results')
+            ->select(
+                'user_id',
+                DB::raw('SUM(score) as total_score'),
+                DB::raw('SUM(question_count) as total_questions')
+            )
+            ->groupBy('user_id');
+
         $rows = User::query()
-            ->leftJoin('exam_results', 'users.id', '=', 'exam_results.user_id')
+            ->leftJoinSub($resultSummary, 'result_summary', function ($join) {
+                $join->on('users.id', '=', 'result_summary.user_id');
+            })
             ->select(
                 'users.id',
                 'users.name',
                 'users.email',
                 'users.role',
-                DB::raw('COALESCE(SUM(exam_results.score), 0) as total_score'),
-                DB::raw('COALESCE(SUM(exam_results.question_count), 0) as total_questions')
+                DB::raw('COALESCE(result_summary.total_score, 0) as total_score'),
+                DB::raw('COALESCE(result_summary.total_questions, 0) as total_questions')
             )
-            ->groupBy('users.id', 'users.name', 'users.email', 'users.role')
             ->orderBy('users.id')
             ->paginate(20);
 

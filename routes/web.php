@@ -5,6 +5,7 @@ use App\Http\Controllers\QuestionController;
 use App\Http\Controllers\ExamController;
 use App\Http\Controllers\QuizController;
 use App\Http\Controllers\FlagController;
+use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\Admin\UserManagementController;
 use App\Http\Controllers\Teacher\StudentProgressController;
 use Illuminate\Support\Facades\Route;
@@ -17,9 +18,9 @@ Route::get('/test', function () { return 'Test page is working!'; });
 
 Route::middleware(['auth', 'quiz.prevent.random.navigation', 'quiz.reset.on.navigation'])->group(function () {
 
-    Route::get('/dashboard', function () {
-        return view('dashboard');
-    })->middleware(['auth', 'verified'])->name('dashboard');
+    Route::get('/dashboard', [DashboardController::class, 'index'])
+        ->middleware('verified')
+        ->name('dashboard');
 
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
