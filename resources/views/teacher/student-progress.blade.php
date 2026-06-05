@@ -18,10 +18,17 @@
             </div>
         @endif
 
-        <div class="mb-6 rounded border border-blue-200 bg-blue-50 p-4">
+        @if ($studentsWithoutRecentFeedback->isNotEmpty())
+            <div id="feedback-reminder" class="mb-4 rounded border border-red-300 bg-red-50 px-4 py-3 text-red-800">
+                <p class="font-semibold">フィードバックコメントのリマインド</p>
+                <p class="mt-1 text-sm">1か月以上フィードバックしていない担当生徒が {{ $studentsWithoutRecentFeedback->count() }} 名います。</p>
+            </div>
+        @endif
+
+        <div id="point-management" class="mb-6 rounded border border-blue-200 bg-blue-50 p-4">
             <h2 class="mb-3 text-lg font-semibold text-blue-900">ポイント管理</h2>
 
-            <form action="{{ route('teacher.students.points.reset-interval') }}" method="POST" class="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
+            <form id="auto-reset-setting" action="{{ route('teacher.students.points.reset-interval') }}" method="POST" class="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
                 @csrf
                 @method('PATCH')
                 <div>
@@ -62,21 +69,25 @@
                         <th class="border-b px-3 py-2 text-right">総正解数</th>
                         <th class="border-b px-3 py-2 text-right">総問題数</th>
                         <th class="border-b px-3 py-2 text-right">正答率</th>
+                        <th class="border-b px-3 py-2 text-left">最終フィードバック</th>
                     </tr>
                 </thead>
                 <tbody>
                     @forelse ($students as $student)
-                        <tr>
+                        <tr class="{{ $student->feedback_overdue ? 'bg-red-50' : '' }}">
                             <td class="border-b px-3 py-2">{{ $student->name }}</td>
                             <td class="border-b px-3 py-2">{{ $student->email }}</td>
                             <td class="border-b px-3 py-2 text-right">{{ (int) $student->total_points }} pt</td>
                             <td class="border-b px-3 py-2 text-right">{{ $student->total_score }}</td>
                             <td class="border-b px-3 py-2 text-right">{{ $student->total_questions }}</td>
                             <td class="border-b px-3 py-2 text-right">{{ $student->accuracy_rate !== null ? $student->accuracy_rate . '%' : 'データなし' }}</td>
+                            <td class="border-b px-3 py-2 {{ $student->feedback_overdue ? 'text-red-700 font-semibold' : 'text-gray-600' }}">
+                                {{ $student->last_feedback_at ? \Carbon\Carbon::parse($student->last_feedback_at)->format('Y-m-d') : '未実施' }}
+                            </td>
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="6" class="px-3 py-4 text-center text-gray-500">担当生徒がまだ設定されていません。</td>
+                            <td colspan="7" class="px-3 py-4 text-center text-gray-500">担当生徒がまだ設定されていません。</td>
                         </tr>
                     @endforelse
                 </tbody>

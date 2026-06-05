@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Question;
+use App\Models\QuestionAnswerLog;
 use App\Models\Exam;
 use App\Models\ExamResult;
 use App\Models\User;
@@ -170,6 +171,15 @@ class QuizController extends Controller
 
         $is_correct = ($selected_option_ids_sorted == $correct_option_ids_sorted);
         $wasAlreadySolved = in_array((int) $question_id, array_map('intval', $state['solved_question_ids'] ?? []), true);
+
+        if ($request->user()?->isStudent()) {
+            // 教師ダッシュボードの問題正答率集計に使う回答ログを保存する。
+            QuestionAnswerLog::create([
+                'user_id' => $request->user()->id,
+                'question_id' => $question->id,
+                'is_correct' => $is_correct,
+            ]);
+        }
 
         $awardedQuestionPoints = 0;
 
