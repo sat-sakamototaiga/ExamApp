@@ -47,6 +47,18 @@
                 @enderror
             </div>
 
+            <div class="mb-4">
+                <label for="difficulty" class="block text-gray-700 text-sm font-bold mb-2">難易度:</label>
+                <select id="difficulty" name="difficulty" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline @error('difficulty') border-red-500 @enderror" required>
+                    <option value="easy" {{ old('difficulty', $question->difficulty ?? 'normal') === 'easy' ? 'selected' : '' }}>Easy (1pt)</option>
+                    <option value="normal" {{ old('difficulty', $question->difficulty ?? 'normal') === 'normal' ? 'selected' : '' }}>Normal (3pt)</option>
+                    <option value="expert" {{ old('difficulty', $question->difficulty ?? 'normal') === 'expert' ? 'selected' : '' }}>Expert (5pt)</option>
+                </select>
+                @error('difficulty')
+                    <p class="text-red-500 text-xs italic">{{ $message }}</p>
+                @enderror
+            </div>
+
             <div class="mb-6">
                 <label for="overall_explanation" class="block text-gray-700 text-sm font-bold mb-2">問題全体の解説 (任意):</label>
                 <textarea id="overall_explanation" name="overall_explanation" rows="3" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline @error('overall_explanation') border-red-500 @enderror">{{ old('overall_explanation', $question->overall_explanation) }}</textarea>

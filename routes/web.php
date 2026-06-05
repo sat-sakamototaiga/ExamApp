@@ -38,6 +38,8 @@ Route::middleware(['auth', 'quiz.prevent.random.navigation', 'quiz.reset.on.navi
         Route::prefix('teacher')->name('teacher.')->group(function () {
             Route::get('/students/progress', [StudentProgressController::class, 'index'])->name('students.progress');
             Route::post('/students/feedback', [StudentProgressController::class, 'storeFeedback'])->name('students.feedback.store');
+            Route::post('/students/points/reset', [StudentProgressController::class, 'resetAllStudentPoints'])->name('students.points.reset');
+            Route::patch('/students/points/reset-interval', [StudentProgressController::class, 'updatePointResetInterval'])->name('students.points.reset-interval');
         });
     });
 

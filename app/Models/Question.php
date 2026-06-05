@@ -15,7 +15,18 @@ class Question extends Model {
         'exam_id',
         'created_by',
         'question_text',
+        'difficulty',
         'overall_explanation', // 変更
+    ];
+
+    public const DIFFICULTY_EASY = 'easy';
+    public const DIFFICULTY_NORMAL = 'normal';
+    public const DIFFICULTY_EXPERT = 'expert';
+
+    public const DIFFICULTIES = [
+        self::DIFFICULTY_EASY,
+        self::DIFFICULTY_NORMAL,
+        self::DIFFICULTY_EXPERT,
     ];
 
     /**
