@@ -255,6 +255,178 @@
                     </div>
                 </div>
                 </div>
+            @elseif (Auth::user()->isStudent() && $studentDashboard)
+                <div class="grid gap-6 lg:grid-cols-2">
+                    <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
+                        <div class="p-6 text-gray-900">
+                            <div class="flex items-start justify-between gap-4">
+                                <div>
+                                    <h3 class="text-lg font-bold text-gray-900">担任フィードバックコメント</h3>
+                                    <p class="mt-1 text-sm text-gray-600">最新のコメントを表示しています。</p>
+                                </div>
+                                <a href="{{ route('dashboard.feedback-history') }}" class="rounded bg-blue-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-blue-700">
+                                    FB履歴
+                                </a>
+                            </div>
+
+                            <div class="mt-4 rounded-lg border border-gray-200 bg-gray-50 px-4 py-3">
+                                @if ($studentDashboard['latestFeedback'])
+                                    <div class="text-xs text-gray-500">
+                                        {{ $studentDashboard['latestFeedback']->created_at->format('Y-m-d H:i') }} / {{ $studentDashboard['latestFeedback']->teacher?->name ?? '担任' }}
+                                    </div>
+                                    <p class="mt-2 text-sm text-gray-800 whitespace-pre-wrap">{{ $studentDashboard['latestFeedback']->comment }}</p>
+                                @else
+                                    <p class="text-sm text-gray-500">フィードバックコメントはまだありません。</p>
+                                @endif
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
+                        <div class="p-6 text-gray-900">
+                            <h3 class="text-lg font-bold text-gray-900">自分の所持ポイント</h3>
+                            <p class="mt-1 text-sm text-gray-600">ポイント合計と順位情報です。</p>
+
+                            <div class="mt-4 flex items-end justify-between rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-4">
+                                <div>
+                                    <div class="text-xs font-semibold text-emerald-800">所持ポイント</div>
+                                    <div class="mt-1 text-3xl font-extrabold text-emerald-900">{{ (int) $studentDashboard['totalPoints'] }} <span class="text-base font-semibold">pt</span></div>
+                                </div>
+                                <div class="text-right">
+                                    <div class="text-xs font-semibold text-gray-600">現在順位（全生徒）</div>
+                                    <div class="mt-1 text-2xl font-bold text-gray-900">{{ $studentDashboard['pointRank'] !== null ? $studentDashboard['pointRank'] : '-' }} 位</div>
+                                </div>
+                            </div>
+                            <p class="mt-2 text-xs text-gray-600">担任ごとの順位は下部の教科別ポイントランキングで確認できます。</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-6 bg-white overflow-hidden shadow-sm sm:rounded-lg">
+                    <div class="p-6 text-gray-900">
+                        <h3 class="text-lg font-bold text-gray-900">正答率が低い問題（ランダム3問）</h3>
+                        <p class="mt-1 text-sm text-gray-600">あなたの解答履歴から正答率が低い問題をランダム表示しています。</p>
+
+                        <div class="mt-4 grid gap-4 md:grid-cols-3">
+                            @forelse ($studentDashboard['weakQuestions'] as $question)
+                                <div class="rounded-lg border border-amber-200 bg-amber-50 p-4">
+                                    <div class="text-xs font-semibold text-amber-800">問題ID: {{ $question->id }} / {{ $question->exam_name ?? '試験未設定' }}</div>
+                                    <p class="mt-2 text-sm text-gray-800">{{ \Illuminate\Support\Str::limit($question->question_text, 90) }}</p>
+                                    <div class="mt-3 flex items-center justify-between text-xs text-gray-600">
+                                        <span>回答 {{ $question->attempt_count }} 回</span>
+                                        <span class="font-semibold text-amber-900">正答率 {{ $question->accuracy_rate }}%</span>
+                                    </div>
+                                </div>
+                            @empty
+                                <div class="md:col-span-3 rounded-lg border border-gray-200 bg-gray-50 px-4 py-6 text-center text-sm text-gray-500">
+                                    解答履歴がまだないため、表示できる問題がありません。
+                                </div>
+                            @endforelse
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-6 bg-white overflow-hidden shadow-sm sm:rounded-lg">
+                    <div class="p-6 text-gray-900">
+                        <h3 class="text-lg font-bold text-gray-900">全生徒ポイントランキング</h3>
+                        <p class="mt-1 text-sm text-gray-600">上位3位とあなたの順位を表示しています。</p>
+
+                        <div class="mt-4 overflow-x-auto">
+                            <table class="min-w-full border border-gray-200">
+                                <thead>
+                                    <tr class="bg-gray-50">
+                                        <th class="border-b px-3 py-2 text-right text-sm">順位</th>
+                                        <th class="border-b px-3 py-2 text-left text-sm">生徒名</th>
+                                        <th class="border-b px-3 py-2 text-right text-sm">ポイント</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @forelse ($studentDashboard['globalRankingDisplayStudents'] as $rankedStudent)
+                                        @php
+                                            $rankRowClass = match ($rankedStudent->point_rank) {
+                                                1 => 'bg-yellow-100',
+                                                2 => 'bg-slate-100',
+                                                3 => 'bg-orange-100',
+                                                default => ($rankedStudent->id === Auth::id() ? 'bg-rose-50' : ''),
+                                            };
+                                        @endphp
+                                        <tr class="{{ $rankRowClass }}">
+                                            <td class="border-b px-3 py-2 text-right text-sm">
+                                                @if ($rankedStudent->point_rank === 1)
+                                                    <span class="mr-1" aria-hidden="true">👑</span>
+                                                @endif
+                                                {{ $rankedStudent->point_rank !== null ? $rankedStudent->point_rank : '-' }} 位
+                                            </td>
+                                            <td class="border-b px-3 py-2 text-sm {{ $rankedStudent->id === Auth::id() ? 'font-semibold text-rose-700' : '' }}">{{ $rankedStudent->name }}</td>
+                                            <td class="border-b px-3 py-2 text-right text-sm">{{ (int) $rankedStudent->total_points }} pt</td>
+                                        </tr>
+                                    @empty
+                                        <tr>
+                                            <td colspan="3" class="px-3 py-4 text-center text-sm text-gray-500">表示できる生徒データがありません。</td>
+                                        </tr>
+                                    @endforelse
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-6 bg-white overflow-hidden shadow-sm sm:rounded-lg">
+                    <div class="p-6 text-gray-900">
+                        <h3 class="text-lg font-bold text-gray-900">教科別ポイントランキング</h3>
+                        <p class="mt-1 text-sm text-gray-600">ランキングは担任ごとの受け持ち生徒単位で集計し、上位3位とあなたの順位を表示しています。</p>
+
+                        <div class="mt-4 space-y-6">
+                            @forelse ($studentDashboard['teacherRankings'] as $teacherRanking)
+                                <div>
+                                    <h4 class="text-base font-semibold text-gray-800">{{ $teacherRanking['teacher']->name }} 先生の受け持ち（教科名は今後対応）</h4>
+
+                                    <div class="mt-2 overflow-x-auto">
+                                        <table class="min-w-full border border-gray-200">
+                                            <thead>
+                                                <tr class="bg-gray-50">
+                                                    <th class="border-b px-3 py-2 text-right text-sm">順位</th>
+                                                    <th class="border-b px-3 py-2 text-left text-sm">生徒名</th>
+                                                    <th class="border-b px-3 py-2 text-right text-sm">ポイント</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                @forelse ($teacherRanking['displayStudents'] as $rankedStudent)
+                                                    @php
+                                                        $rankRowClass = match ($rankedStudent->point_rank) {
+                                                            1 => 'bg-yellow-100',
+                                                            2 => 'bg-slate-100',
+                                                            3 => 'bg-orange-100',
+                                                            default => ($rankedStudent->id === Auth::id() ? 'bg-rose-50' : ''),
+                                                        };
+                                                    @endphp
+                                                    <tr class="{{ $rankRowClass }}">
+                                                        <td class="border-b px-3 py-2 text-right text-sm">
+                                                            @if ($rankedStudent->point_rank === 1)
+                                                                <span class="mr-1" aria-hidden="true">👑</span>
+                                                            @endif
+                                                            {{ $rankedStudent->point_rank !== null ? $rankedStudent->point_rank : '-' }} 位
+                                                        </td>
+                                                        <td class="border-b px-3 py-2 text-sm {{ $rankedStudent->id === Auth::id() ? 'font-semibold text-rose-700' : '' }}">{{ $rankedStudent->name }}</td>
+                                                        <td class="border-b px-3 py-2 text-right text-sm">{{ (int) $rankedStudent->total_points }} pt</td>
+                                                    </tr>
+                                                @empty
+                                                    <tr>
+                                                        <td colspan="3" class="px-3 py-4 text-center text-sm text-gray-500">受け持ち生徒がいません。</td>
+                                                    </tr>
+                                                @endforelse
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            @empty
+                                <div class="rounded-lg border border-gray-200 bg-gray-50 px-4 py-6 text-center text-sm text-gray-500">
+                                    担任が未設定のため、表示できるランキングがありません。
+                                </div>
+                            @endforelse
+                        </div>
+                    </div>
+                </div>
             @else
                 <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
                     <div class="p-6 text-gray-900">

@@ -4,10 +4,12 @@ namespace App\Http\Controllers;
 
 use App\Models\Question;
 use App\Models\PointResetSetting;
+use App\Models\TeacherFeedbackComment;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Contracts\View\View;
+use Illuminate\Support\Collection;
 
 class DashboardController extends Controller
 {
@@ -16,6 +18,7 @@ class DashboardController extends Controller
         $user = auth()->user();
         $activeUsers = null;
         $teacherDashboard = null;
+        $studentDashboard = null;
 
         if ($user?->isAdmin()) {
             $activeUsers = User::query()
@@ -129,9 +132,160 @@ class DashboardController extends Controller
             ];
         }
 
+        if ($user?->isStudent()) {
+            $latestFeedback = TeacherFeedbackComment::query()
+                ->where('student_id', $user->id)
+                ->with('teacher:id,name')
+                ->latest()
+                ->first();
+
+            $currentPoints = (int) $user->total_points;
+
+            // 上部カードの順位は全生徒集計で算出する。
+            $globalRankingStudents = $this->rankStudentsByPoints(
+                User::query()
+                    ->where('role', User::ROLE_STUDENT)
+                    ->select('id', 'name', 'total_points')
+                    ->orderByDesc('total_points')
+                    ->orderBy('name')
+                    ->get()
+            );
+            $globalRankingDisplayStudents = $this->selectRankingDisplayStudents($globalRankingStudents, $user->id);
+
+            $teacherRankings = $user->teachers()
+                ->select('users.id', 'users.name')
+                ->orderBy('users.name')
+                ->get()
+                ->map(function (User $teacher) use ($user) {
+                    $rankedStudents = $this->rankStudentsByPoints(
+                        $teacher->students()
+                            ->select('users.id', 'users.name', 'users.total_points')
+                            ->orderByDesc('users.total_points')
+                            ->orderBy('users.name')
+                            ->get()
+                    );
+
+                    return [
+                        'teacher' => $teacher,
+                        'students' => $rankedStudents,
+                        'displayStudents' => $this->selectRankingDisplayStudents($rankedStudents, $user->id),
+                        'currentStudentRank' => $rankedStudents->firstWhere('id', $user->id)?->point_rank,
+                    ];
+                })
+                ->values();
+
+            $pointRank = $globalRankingStudents
+                ->firstWhere('id', $user->id)
+                ?->point_rank;
+
+            $questionAnswerSummary = DB::table('question_answer_logs')
+                ->select(
+                    'question_id',
+                    DB::raw('COUNT(*) as attempt_count'),
+                    DB::raw('SUM(CASE WHEN is_correct = 1 THEN 1 ELSE 0 END) as correct_count')
+                )
+                ->where('user_id', $user->id)
+                ->groupBy('question_id');
+
+            $allAnsweredQuestions = Question::query()
+                ->joinSub($questionAnswerSummary, 'question_answer_summary', function ($join) {
+                    $join->on('questions.id', '=', 'question_answer_summary.question_id');
+                })
+                ->leftJoin('exams', 'questions.exam_id', '=', 'exams.id')
+                ->select(
+                    'questions.id',
+                    'questions.question_text',
+                    'exams.name as exam_name',
+                    DB::raw('question_answer_summary.attempt_count as attempt_count'),
+                    DB::raw('question_answer_summary.correct_count as correct_count'),
+                    DB::raw('ROUND((question_answer_summary.correct_count / question_answer_summary.attempt_count) * 100, 1) as accuracy_rate')
+                )
+                ->orderBy('accuracy_rate')
+                ->orderByDesc('attempt_count')
+                ->get();
+
+            $lowAccuracyPool = $allAnsweredQuestions
+                ->filter(fn ($question) => (float) $question->accuracy_rate <= 70.0)
+                ->values();
+
+            $questionPool = $lowAccuracyPool->isNotEmpty() ? $lowAccuracyPool : $allAnsweredQuestions;
+
+            $studentDashboard = [
+                'latestFeedback' => $latestFeedback,
+                'totalPoints' => $currentPoints,
+                'pointRank' => $pointRank,
+                'weakQuestions' => $questionPool->shuffle()->take(3)->values(),
+                'teacherRankings' => $teacherRankings,
+                'globalRankingStudents' => $globalRankingStudents,
+                'globalRankingDisplayStudents' => $globalRankingDisplayStudents,
+            ];
+        }
+
         return view('dashboard', [
             'activeUsers' => $activeUsers,
             'teacherDashboard' => $teacherDashboard,
+            'studentDashboard' => $studentDashboard,
         ]);
+    }
+
+    public function feedbackHistory(Request $request): View
+    {
+        $user = $request->user();
+
+        abort_unless($user?->isStudent(), 403, '生徒のみ閲覧できます。');
+
+        $feedbackComments = TeacherFeedbackComment::query()
+            ->where('student_id', $user->id)
+            ->with('teacher:id,name')
+            ->latest()
+            ->paginate(15);
+
+        return view('student.feedback-history', [
+            'feedbackComments' => $feedbackComments,
+        ]);
+    }
+
+    private function rankStudentsByPoints(Collection $students): Collection
+    {
+        $displayRank = 0;
+        $previousPoints = null;
+
+        return $students->transform(function ($student) use (&$displayRank, &$previousPoints) {
+            $points = (int) $student->total_points;
+
+            if ($points <= 0) {
+                $student->point_rank = null;
+
+                return $student;
+            }
+
+            if ($previousPoints === null || $points < $previousPoints) {
+                $displayRank++;
+            }
+
+            $student->point_rank = $displayRank;
+            $previousPoints = $points;
+
+            return $student;
+        });
+    }
+
+    private function selectRankingDisplayStudents(Collection $rankedStudents, int $currentStudentId, int $topCount = 3): Collection
+    {
+        $topStudents = $rankedStudents->take($topCount)->values();
+
+        if ($topStudents->contains(fn ($student) => (int) $student->id === $currentStudentId)) {
+            return $topStudents;
+        }
+
+        $currentStudent = $rankedStudents->first(fn ($student) => (int) $student->id === $currentStudentId);
+        if ($currentStudent === null) {
+            return $topStudents;
+        }
+
+        return $topStudents
+            ->push($currentStudent)
+            ->sortBy('point_rank')
+            ->values();
     }
 }
