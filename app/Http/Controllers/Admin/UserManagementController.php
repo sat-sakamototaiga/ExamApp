@@ -42,6 +42,12 @@ class UserManagementController extends Controller
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'string', 'lowercase', 'email', 'max:255', 'unique:'.User::class],
             'role' => ['required', Rule::in([User::ROLE_TEACHER, User::ROLE_STUDENT])],
+            'subject_name' => [
+                Rule::requiredIf(fn () => $request->input('role') === User::ROLE_TEACHER),
+                'nullable',
+                'string',
+                'max:255',
+            ],
             'password' => ['required', 'confirmed', Password::defaults()],
         ]);
 
@@ -49,6 +55,7 @@ class UserManagementController extends Controller
             'name' => $validated['name'],
             'email' => $validated['email'],
             'role' => $validated['role'],
+            'subject_name' => $validated['role'] === User::ROLE_TEACHER ? trim((string) ($validated['subject_name'] ?? '')) : null,
             'password' => $validated['password'],
         ]);
 
@@ -57,10 +64,10 @@ class UserManagementController extends Controller
 
     public function downloadImportTemplate(CsvImportService $csvImportService)
     {
-        $header = ['名前', 'メールアドレス', 'ロール', 'パスワード'];
+        $header = ['名前', 'メールアドレス', 'ロール', '教科名', 'パスワード'];
         $sampleRows = [
-            ['田中 太郎', 'teacher@example.com', User::ROLE_TEACHER, 'password123'],
-            ['佐藤 花子', 'student@example.com', User::ROLE_STUDENT, 'password123'],
+            ['田中 太郎', 'teacher@example.com', User::ROLE_TEACHER, '数学', 'password123'],
+            ['佐藤 花子', 'student@example.com', User::ROLE_STUDENT, '', 'password123'],
         ];
 
         return $csvImportService->streamTemplateDownload('users_import_template.csv', $header, $sampleRows);
@@ -81,7 +88,7 @@ class UserManagementController extends Controller
         $csvStream = $reader['stream'];
         $header = $reader['header'];
 
-        $expectedHeader = ['名前', 'メールアドレス', 'ロール', 'パスワード'];
+        $expectedHeader = ['名前', 'メールアドレス', 'ロール', '教科名', 'パスワード'];
         if ($header !== $expectedHeader) {
             fclose($csvStream);
 
@@ -125,6 +132,11 @@ class UserManagementController extends Controller
                 continue;
             }
 
+            if ($role === User::ROLE_TEACHER && empty($data['教科名'])) {
+                $errorMessages[] = "{$lineNumber}行目: 教師ロールでは教科名は必須です。";
+                continue;
+            }
+
             if (! filter_var($data['メールアドレス'], FILTER_VALIDATE_EMAIL)) {
                 $errorMessages[] = "{$lineNumber}行目: メールアドレスの形式が不正です。";
                 continue;
@@ -145,6 +157,7 @@ class UserManagementController extends Controller
                     'name' => $data['名前'],
                     'email' => Str::lower($data['メールアドレス']),
                     'role' => $role,
+                    'subject_name' => $role === User::ROLE_TEACHER ? $data['教科名'] : null,
                     'password' => $data['パスワード'],
                 ]);
                 $importedCount++;

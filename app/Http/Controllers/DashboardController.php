@@ -16,6 +16,7 @@ class DashboardController extends Controller
         $user = auth()->user();
         $activeUsers = null;
         $teacherDashboard = null;
+        $studentDashboard = null;
 
         if ($user?->isAdmin()) {
             $activeUsers = User::query()
@@ -129,9 +130,58 @@ class DashboardController extends Controller
             ];
         }
 
+        if ($user?->isStudent()) {
+            $subjectNames = DB::table('teacher_student as ts')
+                ->join('users as teachers', 'teachers.id', '=', 'ts.teacher_id')
+                ->where('ts.student_id', $user->id)
+                ->where('teachers.role', User::ROLE_TEACHER)
+                ->whereNotNull('teachers.subject_name')
+                ->where('teachers.subject_name', '!=', '')
+                ->distinct()
+                ->orderBy('teachers.subject_name')
+                ->pluck('teachers.subject_name');
+
+            $subjectRankings = collect();
+
+            foreach ($subjectNames as $subjectName) {
+                $studentIds = DB::table('teacher_student as ts')
+                    ->join('users as teachers', 'teachers.id', '=', 'ts.teacher_id')
+                    ->where('teachers.role', User::ROLE_TEACHER)
+                    ->where('teachers.subject_name', $subjectName)
+                    ->distinct()
+                    ->pluck('ts.student_id');
+
+                if ($studentIds->isEmpty()) {
+                    continue;
+                }
+
+                $rankedStudents = User::query()
+                    ->where('role', User::ROLE_STUDENT)
+                    ->whereIn('id', $studentIds)
+                    ->orderByDesc('total_points')
+                    ->orderBy('name')
+                    ->get(['id', 'name', 'total_points']);
+
+                $myRankIndex = $rankedStudents->search(fn ($student) => (int) $student->id === (int) $user->id);
+
+                $subjectRankings->push([
+                    'subject_name' => $subjectName,
+                    'participant_count' => $rankedStudents->count(),
+                    'my_rank' => $myRankIndex === false ? null : ($myRankIndex + 1),
+                    'my_points' => (int) $user->total_points,
+                    'top_students' => $rankedStudents->take(5),
+                ]);
+            }
+
+            $studentDashboard = [
+                'subjectRankings' => $subjectRankings,
+            ];
+        }
+
         return view('dashboard', [
             'activeUsers' => $activeUsers,
             'teacherDashboard' => $teacherDashboard,
+            'studentDashboard' => $studentDashboard,
         ]);
     }
 }

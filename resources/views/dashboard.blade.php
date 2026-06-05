@@ -255,6 +255,52 @@
                     </div>
                 </div>
                 </div>
+            @elseif (Auth::user()->isStudent() && $studentDashboard)
+                <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
+                    <div class="p-6 text-gray-900">
+                        <h3 class="text-lg font-bold text-gray-900">生徒ダッシュボード</h3>
+                        <p class="mt-1 text-sm text-gray-600">担当教師の教科ごとに、あなたのポイント順位を表示します。</p>
+
+                        @if ($studentDashboard['subjectRankings']->isEmpty())
+                            <div class="mt-4 rounded border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-600">
+                                教科別ランキングの対象データがありません。担当教師の設定を確認してください。
+                            </div>
+                        @else
+                            <div class="mt-6 grid gap-4 lg:grid-cols-2">
+                                @foreach ($studentDashboard['subjectRankings'] as $subjectRanking)
+                                    <section class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+                                        <div class="flex items-end justify-between gap-3">
+                                            <h4 class="text-base font-semibold text-gray-900">{{ $subjectRanking['subject_name'] }}</h4>
+                                            <p class="text-sm text-gray-600">{{ $subjectRanking['participant_count'] }}名中 {{ $subjectRanking['my_rank'] ?? '-' }}位</p>
+                                        </div>
+                                        <p class="mt-1 text-sm text-gray-600">あなたのポイント: {{ $subjectRanking['my_points'] }} pt</p>
+
+                                        <div class="mt-3 overflow-x-auto">
+                                            <table class="min-w-full border border-gray-200">
+                                                <thead>
+                                                    <tr class="bg-gray-50">
+                                                        <th class="border-b px-3 py-2 text-right text-xs">順位</th>
+                                                        <th class="border-b px-3 py-2 text-left text-xs">生徒名</th>
+                                                        <th class="border-b px-3 py-2 text-right text-xs">ポイント</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    @foreach ($subjectRanking['top_students'] as $topIndex => $topStudent)
+                                                        <tr class="{{ (int) $topStudent->id === (int) Auth::id() ? 'bg-blue-50' : '' }}">
+                                                            <td class="border-b px-3 py-2 text-right text-sm">{{ $topIndex + 1 }}</td>
+                                                            <td class="border-b px-3 py-2 text-sm">{{ $topStudent->name }}</td>
+                                                            <td class="border-b px-3 py-2 text-right text-sm">{{ (int) $topStudent->total_points }} pt</td>
+                                                        </tr>
+                                                    @endforeach
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </section>
+                                @endforeach
+                            </div>
+                        @endif
+                    </div>
+                </div>
             @else
                 <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
                     <div class="p-6 text-gray-900">
