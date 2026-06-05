@@ -21,6 +21,11 @@ class StudentProgressController extends Controller
         $pointResetSetting = PointResetSetting::query()->first();
 
         $assignedStudentIds = $teacher->students()->pluck('users.id');
+        // 担当生徒ごとの最新フィードバック日時を抽出してリマインド判定に使う。
+        $latestFeedbackSummary = DB::table('teacher_feedback_comments')
+            ->select('student_id', DB::raw('MAX(created_at) as last_feedback_at'))
+            ->where('teacher_id', $teacher->id)
+            ->groupBy('student_id');
 
         $resultSummary = DB::table('exam_results')
             ->select(
@@ -35,15 +40,19 @@ class StudentProgressController extends Controller
             ->leftJoinSub($resultSummary, 'result_summary', function ($join) {
                 $join->on('users.id', '=', 'result_summary.user_id');
             })
+            ->leftJoinSub($latestFeedbackSummary, 'latest_feedback_summary', function ($join) {
+                $join->on('users.id', '=', 'latest_feedback_summary.student_id');
+            })
             ->select(
                 'users.id',
                 'users.name',
                 'users.email',
                 'users.total_points',
                 DB::raw('COALESCE(result_summary.total_score, 0) as total_score'),
-                DB::raw('COALESCE(result_summary.total_questions, 0) as total_questions')
+                DB::raw('COALESCE(result_summary.total_questions, 0) as total_questions'),
+                DB::raw('latest_feedback_summary.last_feedback_at as last_feedback_at')
             )
-            ->groupBy('users.id', 'users.name', 'users.email', 'users.total_points')
+            ->groupBy('users.id', 'users.name', 'users.email', 'users.total_points', 'latest_feedback_summary.last_feedback_at')
             ->orderBy('users.name')
             ->get();
 
@@ -51,9 +60,16 @@ class StudentProgressController extends Controller
             $student->accuracy_rate = ((int) $student->total_questions > 0)
                 ? round(((int) $student->total_score / (int) $student->total_questions) * 100, 1)
                 : null;
+            // 30日以上未コメント、または未コメントを期限超過として扱う。
+            $student->feedback_overdue = $student->last_feedback_at === null
+                || now()->diffInDays($student->last_feedback_at) >= 30;
 
             return $student;
         });
+
+        $studentsWithoutRecentFeedback = $students
+            ->filter(fn ($student) => $student->feedback_overdue)
+            ->values();
 
         $feedbackByStudent = TeacherFeedbackComment::query()
             ->where('teacher_id', $teacher->id)
@@ -62,7 +78,7 @@ class StudentProgressController extends Controller
             ->latest()
             ->get();
 
-        return view('teacher.student-progress', compact('students', 'feedbackByStudent', 'pointResetSetting'));
+        return view('teacher.student-progress', compact('students', 'feedbackByStudent', 'pointResetSetting', 'studentsWithoutRecentFeedback'));
     }
 
     public function updatePointResetInterval(Request $request): RedirectResponse
@@ -83,7 +99,10 @@ class StudentProgressController extends Controller
 
         $setting->save();
 
-        return back()->with('success', 'ポイント自動リセット間隔を更新しました。');
+        return back()
+            ->with('success', 'ポイント自動リセット間隔を更新しました。')
+            // ダッシュボード側で操作完了UIを切り替えるためのフラグ。
+            ->with('completed_action', 'auto_reset_updated');
     }
 
     public function resetAllStudentPoints(Request $request): RedirectResponse
@@ -105,7 +124,10 @@ class StudentProgressController extends Controller
             $setting->save();
         });
 
-        return back()->with('success', '全生徒のポイントをリセットしました。');
+        return back()
+            ->with('success', '全生徒のポイントをリセットしました。')
+            // ダッシュボード側で完了ポップアップを表示するためのフラグ。
+            ->with('completed_action', 'points_reset');
     }
 
     public function storeFeedback(Request $request): RedirectResponse
