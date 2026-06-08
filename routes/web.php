@@ -21,6 +21,9 @@ Route::middleware(['auth', 'quiz.prevent.random.navigation', 'quiz.reset.on.navi
     Route::get('/dashboard', [DashboardController::class, 'index'])
         ->middleware('verified')
         ->name('dashboard');
+    Route::get('/dashboard/feedback-history', [DashboardController::class, 'feedbackHistory'])
+        ->middleware('verified')
+        ->name('dashboard.feedback-history');
 
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');

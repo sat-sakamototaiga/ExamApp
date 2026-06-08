@@ -1,90 +1,88 @@
 # StudyTestApp
 
-StudyTestApp は、Laravel 12 をベースにした学習用テストアプリです。試験ごとの問題管理、受験、要復習フラグ、教師による担当生徒の進捗確認、管理者によるユーザー管理をまとめて扱います。
-
-詳細な機能整理は [docs/application_overview_ja.md](docs/application_overview_ja.md) を参照してください。
+StudyTestApp は、Laravel 12 ベースの学習用テストアプリです。問題・試験の管理、受験、要復習フラグ、ポイント付与、教師の生徒進捗確認、管理者のユーザー運用を一体で扱います。
 
 ## 主な機能
 
-- 試験管理: 試験一覧、作成、編集、削除
-- 試験管理の編集と削除は管理者のみ実行可能
-- 問題管理: 問題の作成、一覧、編集、削除
-- 問題管理では CSV インポートとテンプレートダウンロードに対応
-- 教師は自分が作成した問題のみ編集・削除可能
-- 受験機能: 試験を選んでランダムに 1 問出題
-- 受験機能は複数選択対応の完全一致採点
-- 結果画面で問題全体の解説と選択肢ごとの解説を表示
-- 要復習フラグ: 問題ごとのフラグ付けと解除
-- 問題一覧でフラグ付きのみ抽出可能
-- 教師機能: 担当生徒の正答率集計の閲覧とフィードバックコメント保存
-- 管理者機能: 教師・生徒ユーザーの個別登録、CSV 一括登録、教師と生徒の紐付け管理、全ユーザーの正答率一覧
+- 試験管理: 一覧、作成、編集、削除
+- 問題管理: 一覧、作成、編集、削除、CSV インポート、テンプレートダウンロード
+- 受験機能: 通常モード、フラグ付きモード、指定数ランダム出題モード
+- 採点機能: 複数選択の完全一致採点、解説表示、試験結果保存
+- ポイント機能: 問題難易度に応じた加点、全問正解ボーナス
+- フラグ機能: 問題ごとの要復習フラグ切り替え
+- 教師機能: 担当生徒の正答率とポイントの確認、フィードバックコメント
+- 教師機能: 全生徒ポイントの手動リセット、自動リセット間隔の設定
+- 管理者機能: ユーザー個別登録、CSV 一括登録、教師生徒紐付け、正答率一覧
 
 ## ロール
 
-- admin: 全機能にアクセス可能
-- admin は試験の編集・削除、ユーザー管理、教師生徒紐付け管理を担当
-- teacher: 問題管理、CSV インポート、受験機能を利用可能
-- teacher は自分が作成した問題だけ編集・削除可能
-- teacher は担当生徒の進捗とフィードバックを扱える
-- student: 受験、フラグ、プロフィール関連を利用可能
+- student: 受験、フラグ、プロフィール更新
+- teacher: student 権限に加え、問題管理、試験作成、生徒進捗管理
+- admin: teacher 権限に加え、試験編集・削除、ユーザー管理、紐付け管理
+
+補足:
+
 - 新規登録ユーザーは既定で student
+- teacher の問題編集・削除は自分が作成した問題のみ
+- 試験の編集・削除は admin のみ
 
 ## 技術スタック
 
-- PHP 8.2 以上
+- PHP 8.2+
 - Laravel 12
 - Blade
 - Tailwind CSS
 - Vite
-- Eloquent ORM
+- SQLite（既定）
 
-## セットアップ
+## クイックスタート
 
-1. 依存関係をインストールします。
+1. 依存関係をインストール
 
 ```bash
 composer install
 npm install
 ```
 
-1. 環境設定を作成します。
+2. 環境ファイルとアプリキーを準備
 
 ```bash
-copy .env.example .env
+cp .env.example .env
 php artisan key:generate
 ```
 
-1. データベースを設定してマイグレーションを実行します。
+3. DB ファイルを準備してマイグレーション
 
 ```bash
+touch database/database.sqlite
 php artisan migrate
 ```
 
-1. 管理者が必要なら作成します。
+4. 必要なら管理者を作成
 
 ```bash
 php artisan admin:create-user "Admin User" "admin@example.com" --password=password123 --verified
 ```
 
-1. 開発サーバーを起動します。
+5. 開発サーバー起動
 
 ```bash
 composer run dev
 ```
 
-## 主なルート構成
+## 主なルート
 
-- 認証不要: /
-- 認証必須: /dashboard, /profile, /quiz, /quiz/{exam}
-- teacher 以上: /questions, /questions/import, /exams, /teacher/students/progress
-- admin のみ: /admin/users, /admin/users/accuracy, /admin/teacher-students
+- 公開: `/`, `/test`
+- 認証必須: `/dashboard`, `/profile`, `/quiz`, `/quiz/{exam}`, `/quiz/{exam}/resume`, `/quiz/{exam}/next`
+- teacher 以上: `/questions`, `/questions/import`, `/exams`, `/teacher/students/progress`, `/teacher/students/points/reset`
+- admin のみ: `/admin/users`, `/admin/users/accuracy`, `/admin/teacher-students`
 
 ## 運用メモ
 
-- CLI で PHP 8.2 未満を使うと Composer の platform check により artisan 実行が失敗します。
-- admin:create-user は [routes/console.php](routes/console.php) に定義されています。
-- 試験結果集計画面は exam_results テーブルを参照しますが、現状の受験処理では exam_results への保存を行っていません。そのため、集計画面は別途データ投入しない限り空または 0 件ベースになります。
-- Dockerfile と docker-compose.yml は存在しますが、この README ではローカル開発手順を正としています。
+- `admin:create-user` は `routes/console.php` の Artisan クロージャコマンド
+- 受験完了時には `exam_results` へ結果を保存
+- ポイント自動リセットは教師画面アクセス時に期限判定して実行
+- Dockerfile と docker-compose.yml は同梱済み（README はローカル実行手順を優先）
 
 ## テスト
 
@@ -95,3 +93,4 @@ composer test
 ## ドキュメント
 
 - [docs/application_overview_ja.md](docs/application_overview_ja.md)
+- [docs/setup_ja.md](docs/setup_ja.md)
