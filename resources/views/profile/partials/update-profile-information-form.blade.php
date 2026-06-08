@@ -47,6 +47,14 @@
             @endif
         </div>
 
+        @if ($user->isTeacher())
+            <div>
+                <x-input-label for="subject_name" :value="__('担当教科')" />
+                <x-text-input id="subject_name" name="subject_name" type="text" class="mt-1 block w-full" :value="old('subject_name', $user->subject_name)" required autocomplete="off" />
+                <x-input-error class="mt-2" :messages="$errors->get('subject_name')" />
+            </div>
+        @endif
+
         <div class="flex items-center gap-4">
             <x-primary-button>{{ __('保存') }}</x-primary-button>
 
