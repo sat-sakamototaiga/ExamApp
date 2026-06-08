@@ -32,6 +32,7 @@ class User extends Authenticatable {
         'name',
         'email',
         'role',
+        'subject_name',
         'total_points',
         'points_reset_at',
         'password',

@@ -27,7 +27,7 @@
         @php
             $openIndividualForm = old('form_type') === 'individual';
             $openCsvForm = old('form_type') === 'csv';
-            $tableColspan = in_array($selectedRole, ['teacher', 'student'], true) ? 4 : 3;
+            $tableColspan = $selectedRole === 'teacher' ? 5 : (in_array($selectedRole, ['student'], true) ? 4 : 3);
         @endphp
 
         @if ($openIndividualForm)
@@ -93,6 +93,12 @@
                             <option value="teacher" {{ old('role') === 'teacher' ? 'selected' : '' }}>教師</option>
                             <option value="student" {{ old('role') === 'student' ? 'selected' : '' }}>生徒</option>
                         </select>
+                        <p class="mt-1 text-xs text-gray-500">教師を選択した場合は教科名が必須です。</p>
+                    </div>
+
+                    <div>
+                        <label for="subject_name" class="block text-sm font-medium text-gray-700">教科名（教師は必須）</label>
+                        <input id="subject_name" name="subject_name" type="text" value="{{ old('subject_name') }}" class="mt-1 w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" placeholder="例: 数学">
                     </div>
 
                     <div>
@@ -125,8 +131,8 @@
 
                 <div class="mt-4 rounded bg-gray-50 p-4 text-sm text-gray-700">
                     <p>CSV ヘッダー形式:</p>
-                    <p class="mt-1 font-mono text-xs break-all">名前,メールアドレス,ロール,パスワード</p>
-                    <p class="mt-2">ロールは teacher または student を指定してください。パスワードは 8 文字以上です。</p>
+                    <p class="mt-1 font-mono text-xs break-all">名前,メールアドレス,ロール,教科名,パスワード</p>
+                    <p class="mt-2">ロールは teacher または student を指定してください。teacher の場合は教科名を必ず入力し、パスワードは 8 文字以上です。</p>
                     <a href="{{ route('admin.users.import.template') }}" class="mt-3 inline-flex rounded bg-blue-600 px-4 py-2 text-white hover:bg-blue-700">CSVテンプレートをダウンロード</a>
                 </div>
 
@@ -160,6 +166,7 @@
                         <th class="border-b px-3 py-2 text-left">メール</th>
                         <th class="border-b px-3 py-2 text-left">ロール</th>
                         @if ($selectedRole === 'teacher')
+                            <th class="border-b px-3 py-2 text-left">教科名</th>
                             <th class="border-b px-3 py-2 text-right">担当生徒数</th>
                         @elseif ($selectedRole === 'student')
                             <th class="border-b px-3 py-2 text-right">担当教師数</th>
@@ -173,6 +180,7 @@
                             <td class="border-b px-3 py-2">{{ $user->email }}</td>
                             <td class="border-b px-3 py-2">{{ $user->role }}</td>
                             @if ($selectedRole === 'teacher')
+                                <td class="border-b px-3 py-2">{{ $user->subject_name }}</td>
                                 <td class="border-b px-3 py-2 text-right">{{ $user->students_count }}</td>
                             @elseif ($selectedRole === 'student')
                                 <td class="border-b px-3 py-2 text-right">{{ $user->teachers_count }}</td>

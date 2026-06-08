@@ -21,6 +21,7 @@ class UserManagementTest extends TestCase
             'name' => 'Teacher One',
             'email' => 'teacher1@example.com',
             'role' => User::ROLE_TEACHER,
+            'subject_name' => '数学',
             'password' => 'password123',
             'password_confirmation' => 'password123',
         ]);
@@ -30,6 +31,7 @@ class UserManagementTest extends TestCase
             'name' => 'Teacher One',
             'email' => 'teacher1@example.com',
             'role' => User::ROLE_TEACHER,
+            'subject_name' => '数学',
         ]);
     }
 
@@ -40,9 +42,9 @@ class UserManagementTest extends TestCase
         ]);
 
         $csv = implode("\n", [
-            '名前,メールアドレス,ロール,パスワード',
-            'Teacher Two,teacher2@example.com,teacher,password123',
-            'Student Two,student2@example.com,student,password123',
+            '名前,メールアドレス,ロール,教科名,パスワード',
+            'Teacher Two,teacher2@example.com,teacher,理科,password123',
+            'Student Two,student2@example.com,student,,password123',
         ]);
 
         $file = UploadedFile::fake()->createWithContent('users.csv', "\xEF\xBB\xBF{$csv}");
@@ -55,10 +57,35 @@ class UserManagementTest extends TestCase
         $this->assertDatabaseHas('users', [
             'email' => 'teacher2@example.com',
             'role' => User::ROLE_TEACHER,
+            'subject_name' => '理科',
         ]);
         $this->assertDatabaseHas('users', [
             'email' => 'student2@example.com',
             'role' => User::ROLE_STUDENT,
+            'subject_name' => null,
+        ]);
+    }
+
+    public function test_admin_cannot_register_teacher_without_subject_name(): void
+    {
+        $admin = User::factory()->create([
+            'role' => User::ROLE_ADMIN,
+        ]);
+
+        $response = $this->actingAs($admin)->from(route('admin.users.index'))->post(route('admin.users.store'), [
+            'name' => 'Teacher No Subject',
+            'email' => 'teacher-no-subject@example.com',
+            'role' => User::ROLE_TEACHER,
+            'subject_name' => '',
+            'password' => 'password123',
+            'password_confirmation' => 'password123',
+        ]);
+
+        $response->assertRedirect(route('admin.users.index'));
+        $response->assertSessionHasErrors('subject_name');
+
+        $this->assertDatabaseMissing('users', [
+            'email' => 'teacher-no-subject@example.com',
         ]);
     }
 }
