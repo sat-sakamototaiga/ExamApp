@@ -20,6 +20,19 @@ class User extends Authenticatable {
         self::ROLE_ADMIN => 3,
     ];
 
+    public const TEACHER_POSITIONS = [
+        '主幹教諭',
+        '指導教諭',
+        '主任教諭',
+        '教諭',
+        '教務主任',
+        '学年主任',
+        '生徒指導主事',
+        '進路指導主事',
+        '講師',
+        'その他',
+    ];
+
     /** @use HasFactory<\Database\Factories\UserFactory> */
     use HasFactory, Notifiable;
 
@@ -33,6 +46,7 @@ class User extends Authenticatable {
         'email',
         'role',
         'subject_name',
+        'position',
         'total_points',
         'points_reset_at',
         'password',

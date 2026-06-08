@@ -29,6 +29,7 @@ class ProfileUpdateRequest extends FormRequest
 
         if ($this->user()?->isTeacher()) {
             $rules['subject_name'] = ['required', 'string', 'max:255'];
+            $rules['position'] = ['required', Rule::in(User::TEACHER_POSITIONS)];
         }
 
         return $rules;

@@ -27,7 +27,8 @@
         @php
             $openIndividualForm = old('form_type') === 'individual';
             $openCsvForm = old('form_type') === 'csv';
-            $tableColspan = $selectedRole === 'teacher' ? 5 : (in_array($selectedRole, ['student'], true) ? 4 : 3);
+            $teacherPositions = \App\Models\User::TEACHER_POSITIONS;
+            $tableColspan = $selectedRole === 'teacher' ? 6 : (in_array($selectedRole, ['student'], true) ? 4 : 3);
         @endphp
 
         @if ($openIndividualForm)
@@ -102,6 +103,16 @@
                     </div>
 
                     <div>
+                        <label for="position" class="block text-sm font-medium text-gray-700">役職（教師は必須）</label>
+                        <select id="position" name="position" class="mt-1 w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                            <option value="">選択してください</option>
+                            @foreach ($teacherPositions as $position)
+                                <option value="{{ $position }}" {{ old('position') === $position ? 'selected' : '' }}>{{ $position }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+
+                    <div>
                         <label for="password" class="block text-sm font-medium text-gray-700">初期パスワード</label>
                         <input id="password" name="password" type="password" class="mt-1 w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" required>
                     </div>
@@ -131,8 +142,8 @@
 
                 <div class="mt-4 rounded bg-gray-50 p-4 text-sm text-gray-700">
                     <p>CSV ヘッダー形式:</p>
-                    <p class="mt-1 font-mono text-xs break-all">名前,メールアドレス,ロール,教科名,パスワード</p>
-                    <p class="mt-2">ロールは teacher または student を指定してください。teacher の場合は教科名を必ず入力し、パスワードは 8 文字以上です。</p>
+                    <p class="mt-1 font-mono text-xs break-all">名前,メールアドレス,ロール,教科名,役職,パスワード</p>
+                    <p class="mt-2">ロールは teacher または student を指定してください。teacher の場合は教科名と役職を必ず入力し、パスワードは 8 文字以上です。</p>
                     <a href="{{ route('admin.users.import.template') }}" class="mt-3 inline-flex rounded bg-blue-600 px-4 py-2 text-white hover:bg-blue-700">CSVテンプレートをダウンロード</a>
                 </div>
 
@@ -167,6 +178,7 @@
                         <th class="border-b px-3 py-2 text-left">ロール</th>
                         @if ($selectedRole === 'teacher')
                             <th class="border-b px-3 py-2 text-left">教科名</th>
+                            <th class="border-b px-3 py-2 text-left">役職</th>
                             <th class="border-b px-3 py-2 text-right">担当生徒数</th>
                         @elseif ($selectedRole === 'student')
                             <th class="border-b px-3 py-2 text-right">担当教師数</th>
@@ -181,6 +193,7 @@
                             <td class="border-b px-3 py-2">{{ $user->role }}</td>
                             @if ($selectedRole === 'teacher')
                                 <td class="border-b px-3 py-2">{{ $user->subject_name }}</td>
+                                <td class="border-b px-3 py-2">{{ $user->position }}</td>
                                 <td class="border-b px-3 py-2 text-right">{{ $user->students_count }}</td>
                             @elseif ($selectedRole === 'student')
                                 <td class="border-b px-3 py-2 text-right">{{ $user->teachers_count }}</td>

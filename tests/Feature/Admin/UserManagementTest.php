@@ -22,6 +22,7 @@ class UserManagementTest extends TestCase
             'email' => 'teacher1@example.com',
             'role' => User::ROLE_TEACHER,
             'subject_name' => '数学',
+            'position' => '教諭',
             'password' => 'password123',
             'password_confirmation' => 'password123',
         ]);
@@ -32,6 +33,7 @@ class UserManagementTest extends TestCase
             'email' => 'teacher1@example.com',
             'role' => User::ROLE_TEACHER,
             'subject_name' => '数学',
+            'position' => '教諭',
         ]);
     }
 
@@ -42,9 +44,9 @@ class UserManagementTest extends TestCase
         ]);
 
         $csv = implode("\n", [
-            '名前,メールアドレス,ロール,教科名,パスワード',
-            'Teacher Two,teacher2@example.com,teacher,理科,password123',
-            'Student Two,student2@example.com,student,,password123',
+            '名前,メールアドレス,ロール,教科名,役職,パスワード',
+            'Teacher Two,teacher2@example.com,teacher,理科,主任教諭,password123',
+            'Student Two,student2@example.com,student,,,password123',
         ]);
 
         $file = UploadedFile::fake()->createWithContent('users.csv', "\xEF\xBB\xBF{$csv}");
@@ -58,11 +60,13 @@ class UserManagementTest extends TestCase
             'email' => 'teacher2@example.com',
             'role' => User::ROLE_TEACHER,
             'subject_name' => '理科',
+            'position' => '主任教諭',
         ]);
         $this->assertDatabaseHas('users', [
             'email' => 'student2@example.com',
             'role' => User::ROLE_STUDENT,
             'subject_name' => null,
+            'position' => null,
         ]);
     }
 
@@ -77,6 +81,7 @@ class UserManagementTest extends TestCase
             'email' => 'teacher-no-subject@example.com',
             'role' => User::ROLE_TEACHER,
             'subject_name' => '',
+            'position' => '教諭',
             'password' => 'password123',
             'password_confirmation' => 'password123',
         ]);
