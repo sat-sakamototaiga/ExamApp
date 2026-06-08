@@ -61,6 +61,54 @@ class ProfileTest extends TestCase
         $this->assertNotNull($user->refresh()->email_verified_at);
     }
 
+    public function test_teacher_can_update_subject_name_from_profile(): void
+    {
+        $teacher = User::factory()->create([
+            'role' => User::ROLE_TEACHER,
+            'subject_name' => '数学',
+        ]);
+
+        $response = $this
+            ->actingAs($teacher)
+            ->patch('/profile', [
+                'name' => 'Teacher User',
+                'email' => 'teacher-profile@example.com',
+                'subject_name' => '英語',
+            ]);
+
+        $response
+            ->assertSessionHasNoErrors()
+            ->assertRedirect('/profile');
+
+        $teacher->refresh();
+
+        $this->assertSame('英語', $teacher->subject_name);
+    }
+
+    public function test_student_cannot_update_subject_name_from_profile(): void
+    {
+        $student = User::factory()->create([
+            'role' => User::ROLE_STUDENT,
+            'subject_name' => null,
+        ]);
+
+        $response = $this
+            ->actingAs($student)
+            ->patch('/profile', [
+                'name' => 'Student User',
+                'email' => 'student-profile@example.com',
+                'subject_name' => '理科',
+            ]);
+
+        $response
+            ->assertSessionHasNoErrors()
+            ->assertRedirect('/profile');
+
+        $student->refresh();
+
+        $this->assertNull($student->subject_name);
+    }
+
     public function test_user_can_delete_their_account(): void
     {
         $user = User::factory()->create();
