@@ -53,6 +53,16 @@
                 <x-text-input id="subject_name" name="subject_name" type="text" class="mt-1 block w-full" :value="old('subject_name', $user->subject_name)" required autocomplete="off" />
                 <x-input-error class="mt-2" :messages="$errors->get('subject_name')" />
             </div>
+
+            <div>
+                <x-input-label for="position" :value="__('役職')" />
+                <select id="position" name="position" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" required>
+                    @foreach (\App\Models\User::TEACHER_POSITIONS as $position)
+                        <option value="{{ $position }}" @selected(old('position', $user->position) === $position)>{{ $position }}</option>
+                    @endforeach
+                </select>
+                <x-input-error class="mt-2" :messages="$errors->get('position')" />
+            </div>
         @endif
 
         <div class="flex items-center gap-4">

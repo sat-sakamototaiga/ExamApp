@@ -66,6 +66,7 @@ class ProfileTest extends TestCase
         $teacher = User::factory()->create([
             'role' => User::ROLE_TEACHER,
             'subject_name' => '数学',
+            'position' => '教諭',
         ]);
 
         $response = $this
@@ -74,6 +75,7 @@ class ProfileTest extends TestCase
                 'name' => 'Teacher User',
                 'email' => 'teacher-profile@example.com',
                 'subject_name' => '英語',
+                'position' => '主任教諭',
             ]);
 
         $response
@@ -83,6 +85,7 @@ class ProfileTest extends TestCase
         $teacher->refresh();
 
         $this->assertSame('英語', $teacher->subject_name);
+        $this->assertSame('主任教諭', $teacher->position);
     }
 
     public function test_student_cannot_update_subject_name_from_profile(): void
@@ -90,6 +93,7 @@ class ProfileTest extends TestCase
         $student = User::factory()->create([
             'role' => User::ROLE_STUDENT,
             'subject_name' => null,
+            'position' => null,
         ]);
 
         $response = $this
@@ -98,6 +102,7 @@ class ProfileTest extends TestCase
                 'name' => 'Student User',
                 'email' => 'student-profile@example.com',
                 'subject_name' => '理科',
+                'position' => '教諭',
             ]);
 
         $response
@@ -107,6 +112,7 @@ class ProfileTest extends TestCase
         $student->refresh();
 
         $this->assertNull($student->subject_name);
+        $this->assertNull($student->position);
     }
 
     public function test_user_can_delete_their_account(): void
