@@ -55,6 +55,74 @@
                     </button>
                 </div>
             </form>
+
+            @if (auth()->user()?->isStudent())
+                <div id="quiz-reset-warning-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/40 p-4" aria-hidden="true">
+                    <div class="w-full max-w-md rounded-lg bg-white p-6 shadow-xl">
+                        <h3 class="text-lg font-bold text-gray-900">出題状態の警告</h3>
+                        <p class="mt-2 text-sm text-gray-700">この画面から移動すると、現在の出題状態が解除される可能性があります。移動しますか？</p>
+                        <div class="mt-5 flex justify-end gap-3">
+                            <button type="button" id="quiz-reset-warning-cancel" class="rounded border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50">キャンセル</button>
+                            <button type="button" id="quiz-reset-warning-continue" class="rounded bg-red-600 px-4 py-2 text-white hover:bg-red-700">移動する</button>
+                        </div>
+                    </div>
+                </div>
+
+                <script>
+                    document.addEventListener('DOMContentLoaded', () => {
+                        const modal = document.getElementById('quiz-reset-warning-modal');
+                        const cancelButton = document.getElementById('quiz-reset-warning-cancel');
+                        const continueButton = document.getElementById('quiz-reset-warning-continue');
+                        let onContinue = null;
+
+                        if (!modal || !cancelButton || !continueButton) {
+                            return;
+                        }
+
+                        const openModal = (callback) => {
+                            onContinue = callback;
+                            modal.classList.remove('hidden');
+                            modal.classList.add('flex');
+                            modal.setAttribute('aria-hidden', 'false');
+                        };
+
+                        const closeModal = () => {
+                            onContinue = null;
+                            modal.classList.remove('flex');
+                            modal.classList.add('hidden');
+                            modal.setAttribute('aria-hidden', 'true');
+                        };
+
+                        cancelButton.addEventListener('click', closeModal);
+                        modal.addEventListener('click', (event) => {
+                            if (event.target === modal) {
+                                closeModal();
+                            }
+                        });
+                        continueButton.addEventListener('click', () => {
+                            const callback = onContinue;
+                            closeModal();
+                            if (typeof callback === 'function') {
+                                callback();
+                            }
+                        });
+
+                        document.querySelectorAll('a[href]').forEach((link) => {
+                            link.addEventListener('click', (event) => {
+                                const href = link.getAttribute('href');
+                                if (!href || href.startsWith('#')) {
+                                    return;
+                                }
+
+                                event.preventDefault();
+                                openModal(() => {
+                                    window.location.href = href;
+                                });
+                            });
+                        });
+                    });
+                </script>
+            @endif
         @else
             <p class="text-center text-gray-600">この試験には現在、出題できる問題がありません。</p>
             <div class="mt-8 text-center">
@@ -64,17 +132,19 @@
             </div>
         @endif
 
-        <div class="mt-10 text-center">
-            <a href="{{ route('quiz.select_exam') }}" class="text-blue-500 hover:text-blue-800 text-sm">
-                他の試験を選択する
-            </a>
-
-            @if (($quiz_mode ?? 'normal') !== 'random_count')
-                <span class="text-gray-400 mx-2">|</span>
-                <a href="{{ route('questions.index') }}" class="text-blue-500 hover:text-blue-800 text-sm">
-                    問題管理画面へ戻る
+        @if (!auth()->user()?->isStudent())
+            <div class="mt-10 text-center">
+                <a href="{{ route('quiz.select_exam') }}" class="text-blue-500 hover:text-blue-800 text-sm">
+                    他の試験を選択する
                 </a>
-            @endif
-        </div>
+
+                @if (($quiz_mode ?? 'normal') !== 'random_count')
+                    <span class="text-gray-400 mx-2">|</span>
+                    <a href="{{ route('questions.index') }}" class="text-blue-500 hover:text-blue-800 text-sm">
+                        問題管理画面へ戻る
+                    </a>
+                @endif
+            </div>
+        @endif
     </div>
 </x-app-layout>
