@@ -125,11 +125,13 @@
             @endif
         @else
             <p class="text-center text-gray-600">この試験には現在、出題できる問題がありません。</p>
-            <div class="mt-8 text-center">
-                <a href="{{ route('questions.create') }}" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
-                    新しい問題を作成する
-                </a>
-            </div>
+            @if (!auth()->user()?->isStudent())
+                <div class="mt-8 text-center">
+                    <a href="{{ route('questions.create') }}" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
+                        新しい問題を作成する
+                    </a>
+                </div>
+            @endif
         @endif
 
         @if (!auth()->user()?->isStudent())

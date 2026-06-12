@@ -15,12 +15,16 @@
         @endif
 
         @if ($exams->isEmpty())
-            <p class="text-center text-gray-600 mb-6">まだ試験が登録されていません。まずは問題管理画面で試験と問題を作成してください。</p>
-            <div class="text-center">
-                <a href="{{ route('exams.create') }}" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
-                    新しい試験を作成
-                </a>
-            </div>
+            @if (auth()->user()?->isStudent())
+                <p class="text-center text-gray-600 mb-6">現在受験可能な試験はありません。管理者または教師にお問い合わせください。</p>
+            @else
+                <p class="text-center text-gray-600 mb-6">まだ試験が登録されていません。まずは問題管理画面で試験と問題を作成してください。</p>
+                <div class="text-center">
+                    <a href="{{ route('exams.create') }}" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
+                        新しい試験を作成
+                    </a>
+                </div>
+            @endif
         @else
             <form method="GET" class="space-y-6" action="{{ route('quiz.index', ['exam' => 0]) }}" id="quiz-start-form">
                 <div>
@@ -103,14 +107,16 @@
             </script>
         @endif
 
-        <div class="mt-8 text-center">
-            <a href="{{ route('exams.index') }}" class="text-purple-500 hover:text-purple-800 text-sm">
-                試験管理画面へ
-            </a>
-            <span class="text-gray-400 mx-2">|</span>
-            <a href="{{ route('questions.index') }}" class="text-blue-500 hover:text-blue-800 text-sm">
-                問題管理画面へ
-            </a>
-        </div>
+        @if (!auth()->user()?->isStudent())
+            <div class="mt-8 text-center">
+                <a href="{{ route('exams.index') }}" class="text-purple-500 hover:text-purple-800 text-sm">
+                    試験管理画面へ
+                </a>
+                <span class="text-gray-400 mx-2">|</span>
+                <a href="{{ route('questions.index') }}" class="text-blue-500 hover:text-blue-800 text-sm">
+                    問題管理画面へ
+                </a>
+            </div>
+        @endif
     </div>
 </x-app-layout>
