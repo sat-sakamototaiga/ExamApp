@@ -11,6 +11,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB; // トランザクションのために追加
 use Illuminate\Support\Facades\Log; // デバッグ用にLogファサードを追加
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Exception; // Exceptionクラスをインポート
 
@@ -90,11 +91,13 @@ class QuestionController extends Controller {
         $request->validate([
             'exam_id' => 'required|exists:exams,id',
             'question_text' => 'required|string|max:1000',
+            'question_image' => 'nullable|image|max:5120',
             'difficulty' => ['required', Rule::in(Question::DIFFICULTIES)],
             'overall_explanation' => 'nullable|string', // 変更
 
             // 選択肢のバリデーション (少なくとも2つは必要など、要件に応じて調整)
             'options.*.option_text' => 'required|string|max:255',
+            'options.*.option_image' => 'nullable|image|max:5120',
             'options.*.is_correct' => 'nullable|boolean', // チェックボックスなのでnullable
             'options.*.option_explanation' => 'nullable|string',
 
@@ -107,10 +110,15 @@ class QuestionController extends Controller {
         DB::beginTransaction();
         try {
             // 問題を作成
+            $questionImagePath = $request->file('question_image')
+                ? $request->file('question_image')->store('questions', 'public')
+                : null;
+
             $question = Question::create([
                 'exam_id' => $request->input('exam_id'),
                 'created_by' => $user->id,
                 'question_text' => $request->input('question_text'),
+                'question_image_path' => $questionImagePath,
                 'difficulty' => $request->input('difficulty'),
                 'overall_explanation' => $request->input('overall_explanation'),
             ]);
@@ -122,6 +130,9 @@ class QuestionController extends Controller {
 
                 $question->options()->create([
                     'option_text' => $option_data['option_text'],
+                    'option_image_path' => $request->file("options.$key.option_image")
+                        ? $request->file("options.$key.option_image")->store('options', 'public')
+                        : null,
                     'is_correct' => $is_correct,
                     'option_explanation' => $option_data['option_explanation'],
                 ]);
@@ -183,33 +194,79 @@ class QuestionController extends Controller {
         $request->validate([
             'exam_id' => 'required|exists:exams,id',
             'question_text' => 'required|string|max:1000',
+            'question_image' => 'nullable|image|max:5120',
+            'remove_question_image' => 'nullable|boolean',
             'difficulty' => ['required', Rule::in(Question::DIFFICULTIES)],
             'overall_explanation' => 'nullable|string',
             'options.*.option_text' => 'required|string|max:255',
+            'options.*.option_image' => 'nullable|image|max:5120',
+            'remove_option_image.*' => 'nullable|boolean',
             'correct_options' => 'required|array|min:1',
         ]);
 
         try {
+            $optionsBeforeUpdate = $question->options()->orderBy('id')->get();
+
+            $questionImagePath = $question->question_image_path;
+            if ($request->hasFile('question_image')) {
+                $this->deleteImageFromPublicDisk($question->question_image_path);
+                $questionImagePath = $request->file('question_image')->store('questions', 'public');
+            } elseif ($request->boolean('remove_question_image')) {
+                $this->deleteImageFromPublicDisk($question->question_image_path);
+                $questionImagePath = null;
+            }
+
             // 2. 問題の主要情報を更新 (これは正常に動作している部分)
             $question->update([
                 'exam_id' => $request->input('exam_id'),
                 'question_text' => $request->input('question_text'),
+                'question_image_path' => $questionImagePath,
                 'difficulty' => $request->input('difficulty'),
                 'overall_explanation' => $request->input('overall_explanation'),
             ]);
 
             // 3. 選択肢を更新 (これも正常に動作している部分)
             $question->options()->delete();
+            $retainedOptionImagePaths = [];
             foreach ($request->input('options') as $key => $option_data) {
                 if (empty($option_data['option_text'])) {
                     continue;
                 }
+
+                $existingOption = $optionsBeforeUpdate->get($key);
+                $optionImagePath = $existingOption?->option_image_path;
+
+                if ($request->hasFile("options.$key.option_image")) {
+                    $this->deleteImageFromPublicDisk($optionImagePath);
+                    $optionImagePath = $request->file("options.$key.option_image")->store('options', 'public');
+                } elseif ($request->boolean("remove_option_image.$key")) {
+                    $this->deleteImageFromPublicDisk($optionImagePath);
+                    $optionImagePath = null;
+                }
+
+                if ($optionImagePath) {
+                    $retainedOptionImagePaths[] = $optionImagePath;
+                }
+
                 $is_correct = isset($request->input('correct_options')[$key]);
                 $question->options()->create([
                     'option_text' => $option_data['option_text'],
+                    'option_image_path' => $optionImagePath,
                     'is_correct' => $is_correct,
                     'option_explanation' => $option_data['option_explanation'],
                 ]);
+            }
+
+            $oldOptionImagePaths = $optionsBeforeUpdate
+                ->pluck('option_image_path')
+                ->filter()
+                ->unique()
+                ->values();
+
+            foreach ($oldOptionImagePaths as $oldOptionImagePath) {
+                if (!in_array($oldOptionImagePath, $retainedOptionImagePaths, true)) {
+                    $this->deleteImageFromPublicDisk($oldOptionImagePath);
+                }
             }
 
             // 4. フラグのリレーションを更新 (問題の核心部分)
@@ -235,6 +292,12 @@ class QuestionController extends Controller {
     public function destroy(Question $question) {
         $this->authorizeQuestionManagement();
         $this->authorizeQuestionOwnership($question);
+
+        foreach ($question->options as $option) {
+            $this->deleteImageFromPublicDisk($option->option_image_path);
+        }
+
+        $this->deleteImageFromPublicDisk($question->question_image_path);
 
         // 問題を削除
         $question->delete();
@@ -435,6 +498,17 @@ class QuestionController extends Controller {
 
         if (! $user?->isTeacher() || $question->created_by !== $user->id) {
             abort(403, '自分が作成した問題のみ操作できます。');
+        }
+    }
+
+    private function deleteImageFromPublicDisk(?string $path): void
+    {
+        if (! $path) {
+            return;
+        }
+
+        if (Storage::disk('public')->exists($path)) {
+            Storage::disk('public')->delete($path);
         }
     }
 }

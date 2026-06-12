@@ -24,6 +24,11 @@
             <div class="mb-8">
                 <p class="text-lg font-semibold mb-4">問題 {{ $question->id }}:</p>
                 <p class="text-xl leading-relaxed bg-blue-50 p-4 rounded-md border border-blue-200">{!! nl2br(e($question->question_text)) !!}</p>
+                @if ($question->question_image_path)
+                    <div class="mt-4">
+                        <img src="{{ asset('storage/' . $question->question_image_path) }}" alt="問題画像" class="max-h-80 rounded-md border border-blue-200">
+                    </div>
+                @endif
             </div>
 
             <form action="{{ route('quiz.answer', $exam) }}" method="POST">
@@ -35,6 +40,11 @@
                         <label class="block cursor-pointer bg-gray-50 hover:bg-gray-100 p-4 rounded-lg border border-gray-200 shadow-sm">
                             <input type="checkbox" name="selected_options[]" value="{{ $option->id }}" class="mr-3 form-checkbox text-blue-600 focus:ring-blue-500">
                             <span class="text-lg text-gray-800">{!! nl2br(e($option->option_text)) !!}</span>
+                            @if ($option->option_image_path)
+                                <div class="mt-3">
+                                    <img src="{{ asset('storage/' . $option->option_image_path) }}" alt="選択肢画像" class="max-h-48 rounded-md border border-gray-200">
+                                </div>
+                            @endif
                         </label>
                     @endforeach
                 </div>
