@@ -239,11 +239,15 @@ class DashboardController extends Controller
                 ->orderByDesc('attempt_count')
                 ->get();
 
-            $lowAccuracyPool = $allAnsweredQuestions
+            $nonPerfectQuestions = $allAnsweredQuestions
+                ->filter(fn ($question) => (float) $question->accuracy_rate < 100.0)
+                ->values();
+
+            $lowAccuracyPool = $nonPerfectQuestions
                 ->filter(fn ($question) => (float) $question->accuracy_rate <= 70.0)
                 ->values();
 
-            $questionPool = $lowAccuracyPool->isNotEmpty() ? $lowAccuracyPool : $allAnsweredQuestions;
+            $questionPool = $lowAccuracyPool->isNotEmpty() ? $lowAccuracyPool : $nonPerfectQuestions;
 
             $studentDashboard = [
                 'latestFeedback' => $latestFeedback,
@@ -321,7 +325,6 @@ class DashboardController extends Controller
 
         return $topStudents
             ->push($currentStudent)
-            ->sortBy('point_rank')
             ->values();
     }
 }

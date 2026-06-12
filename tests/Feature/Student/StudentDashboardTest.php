@@ -3,6 +3,7 @@
 namespace Tests\Feature\Student;
 
 use App\Models\Exam;
+use App\Models\PointHistory;
 use App\Models\Question;
 use App\Models\QuestionAnswerLog;
 use App\Models\TeacherFeedbackComment;
@@ -214,5 +215,98 @@ class StudentDashboardTest extends TestCase
         $response->assertSee('1 位', false);
         $response->assertSee('2 位', false);
         $response->assertDontSee('3 位', false);
+    }
+
+    public function test_student_dashboard_weak_questions_do_not_include_100_percent_accuracy_questions(): void
+    {
+        $teacher = User::factory()->create([
+            'role' => User::ROLE_TEACHER,
+        ]);
+
+        $student = User::factory()->create([
+            'role' => User::ROLE_STUDENT,
+        ]);
+
+        $exam = Exam::create(['name' => '弱点確認']);
+
+        $questionPerfect = Question::create([
+            'exam_id' => $exam->id,
+            'created_by' => $teacher->id,
+            'question_text' => '正答率100問題',
+            'difficulty' => Question::DIFFICULTY_NORMAL,
+        ]);
+
+        $questionWeak = Question::create([
+            'exam_id' => $exam->id,
+            'created_by' => $teacher->id,
+            'question_text' => '正答率50問題',
+            'difficulty' => Question::DIFFICULTY_NORMAL,
+        ]);
+
+        QuestionAnswerLog::create(['user_id' => $student->id, 'question_id' => $questionPerfect->id, 'is_correct' => true]);
+        QuestionAnswerLog::create(['user_id' => $student->id, 'question_id' => $questionPerfect->id, 'is_correct' => true]);
+
+        QuestionAnswerLog::create(['user_id' => $student->id, 'question_id' => $questionWeak->id, 'is_correct' => true]);
+        QuestionAnswerLog::create(['user_id' => $student->id, 'question_id' => $questionWeak->id, 'is_correct' => false]);
+
+        $response = $this->actingAs($student)->get(route('dashboard'));
+
+        $response->assertOk();
+        $response->assertSee('正答率50問題');
+        $response->assertDontSee('正答率100問題');
+    }
+
+    public function test_student_dashboard_appends_current_student_after_top_three_when_outside_top_three(): void
+    {
+        $student = User::factory()->create([
+            'role' => User::ROLE_STUDENT,
+            'name' => '対象生徒',
+            'total_points' => 0,
+        ]);
+
+        $top1 = User::factory()->create(['role' => User::ROLE_STUDENT, 'total_points' => 100]);
+        $top2 = User::factory()->create(['role' => User::ROLE_STUDENT, 'total_points' => 90]);
+        $top3 = User::factory()->create(['role' => User::ROLE_STUDENT, 'total_points' => 80]);
+        User::factory()->create(['role' => User::ROLE_STUDENT, 'total_points' => 70]);
+
+        $response = $this->actingAs($student)->get(route('dashboard'));
+
+        $response->assertOk();
+
+        /** @var array<string, mixed> $studentDashboard */
+        $studentDashboard = $response->viewData('studentDashboard');
+        $displayStudents = $studentDashboard['globalRankingDisplayStudents'];
+
+        $this->assertCount(4, $displayStudents);
+        $this->assertSame([$top1->id, $top2->id, $top3->id, $student->id], $displayStudents->pluck('id')->all());
+    }
+
+    public function test_student_dashboard_point_history_event_type_is_localized_to_japanese(): void
+    {
+        $teacher = User::factory()->create([
+            'role' => User::ROLE_TEACHER,
+            'subject_name' => '数学',
+        ]);
+
+        $student = User::factory()->create([
+            'role' => User::ROLE_STUDENT,
+        ]);
+
+        PointHistory::create([
+            'user_id' => $student->id,
+            'teacher_id' => $teacher->id,
+            'question_id' => null,
+            'exam_id' => null,
+            'event_type' => PointHistory::EVENT_PERFECT_BONUS,
+            'points_delta' => 10,
+            'balance_after' => 10,
+            'notes' => 'テスト用',
+        ]);
+
+        $response = $this->actingAs($student)->get(route('dashboard'));
+
+        $response->assertOk();
+        $response->assertSee('全問正解ボーナス');
+        $response->assertDontSee(PointHistory::EVENT_PERFECT_BONUS);
     }
 }

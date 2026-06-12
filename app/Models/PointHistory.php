@@ -23,6 +23,13 @@ class PointHistory extends Model
         'notes',
     ];
 
+    private const EVENT_TYPE_LABELS = [
+        self::EVENT_QUESTION_CORRECT => '問題正解',
+        self::EVENT_PERFECT_BONUS => '全問正解ボーナス',
+        self::EVENT_MANUAL_RESET => '手動リセット',
+        self::EVENT_AUTO_RESET => '自動リセット',
+    ];
+
     protected function casts(): array
     {
         return [
@@ -49,5 +56,10 @@ class PointHistory extends Model
     public function exam(): BelongsTo
     {
         return $this->belongsTo(Exam::class);
+    }
+
+    public function getEventTypeLabelAttribute(): string
+    {
+        return self::EVENT_TYPE_LABELS[$this->event_type] ?? $this->event_type;
     }
 }

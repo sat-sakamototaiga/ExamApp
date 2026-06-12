@@ -178,6 +178,10 @@
                         次の問題へ ({{ $exam->name }})
                     </button>
                 </form>
+            @else
+                <a href="{{ route('quiz.exam_result', $exam) }}" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 px-6 rounded-full text-lg shadow-md transition duration-300 ease-in-out transform hover:scale-105">
+                    試験リザルトへ
+                </a>
             @endif
 
             @if (!auth()->user()?->isStudent())
