@@ -12,7 +12,7 @@
             </div>
         @endif
 
-        <form action="{{ route('questions.store') }}" method="POST">
+        <form action="{{ route('questions.store') }}" method="POST" enctype="multipart/form-data">
             @csrf
 
             <div class="mb-4">
@@ -34,6 +34,14 @@
                 <label for="question_text" class="block text-gray-700 text-sm font-bold mb-2">問題文:</label>
                 <textarea id="question_text" name="question_text" rows="4" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline @error('question_text') border-red-500 @enderror">{{ old('question_text') }}</textarea>
                 @error('question_text')
+                    <p class="text-red-500 text-xs italic">{{ $message }}</p>
+                @enderror
+            </div>
+
+            <div class="mb-4">
+                <label for="question_image" class="block text-gray-700 text-sm font-bold mb-2">問題画像 (任意):</label>
+                <input type="file" id="question_image" name="question_image" accept="image/*" class="block w-full text-sm text-gray-700">
+                @error('question_image')
                     <p class="text-red-500 text-xs italic">{{ $message }}</p>
                 @enderror
             </div>
@@ -67,6 +75,13 @@
                         <label for="option_text_{{ $i }}" class="block text-gray-700 text-sm font-bold mb-1">内容:</label>
                         <input type="text" id="option_text_{{ $i }}" name="options[{{ $i }}][option_text]" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline @error('options.'.$i.'.option_text') border-red-500 @enderror" value="{{ old('options.'.$i.'.option_text') }}" required>
                         @error('options.'.$i.'.option_text')
+                            <p class="text-red-500 text-xs italic">{{ $message }}</p>
+                        @enderror
+                    </div>
+                    <div class="mb-2">
+                        <label for="option_image_{{ $i }}" class="block text-gray-700 text-sm font-bold mb-1">画像 (任意):</label>
+                        <input type="file" id="option_image_{{ $i }}" name="options[{{ $i }}][option_image]" accept="image/*" class="block w-full text-sm text-gray-700">
+                        @error('options.'.$i.'.option_image')
                             <p class="text-red-500 text-xs italic">{{ $message }}</p>
                         @enderror
                     </div>

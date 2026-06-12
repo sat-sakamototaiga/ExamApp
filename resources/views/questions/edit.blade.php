@@ -9,7 +9,7 @@
             </div>
         @endif
 
-        <form action="{{ route('questions.update', $question) }}" method="POST">
+        <form action="{{ route('questions.update', $question) }}" method="POST" enctype="multipart/form-data">
             @csrf
             @method('PUT')
 
@@ -43,6 +43,23 @@
                 <label for="question_text" class="block text-gray-700 text-sm font-bold mb-2">問題文:</label>
                 <textarea id="question_text" name="question_text" rows="4" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline @error('question_text') border-red-500 @enderror">{{ old('question_text', $question->question_text) }}</textarea>
                 @error('question_text')
+                    <p class="text-red-500 text-xs italic">{{ $message }}</p>
+                @enderror
+            </div>
+
+            <div class="mb-4">
+                <label for="question_image" class="block text-gray-700 text-sm font-bold mb-2">問題画像 (任意):</label>
+                @if ($question->question_image_path)
+                    <div class="mb-2">
+                        <img src="{{ asset('storage/' . $question->question_image_path) }}" alt="問題画像" class="max-h-48 rounded border border-gray-200">
+                    </div>
+                    <label class="inline-flex items-center mb-2">
+                        <input type="checkbox" name="remove_question_image" value="1" class="form-checkbox text-red-600" {{ old('remove_question_image') ? 'checked' : '' }}>
+                        <span class="ml-2 text-sm text-gray-700">現在の画像を削除する</span>
+                    </label>
+                @endif
+                <input type="file" id="question_image" name="question_image" accept="image/*" class="block w-full text-sm text-gray-700">
+                @error('question_image')
                     <p class="text-red-500 text-xs italic">{{ $message }}</p>
                 @enderror
             </div>
@@ -82,6 +99,22 @@
                         @enderror
                     </div>
                     <div class="mb-2">
+                        <label for="option_image_{{ $i }}" class="block text-gray-700 text-sm font-bold mb-1">画像 (任意):</label>
+                        @if ($option->option_image_path)
+                            <div class="mb-2">
+                                <img src="{{ asset('storage/' . $option->option_image_path) }}" alt="選択肢画像" class="max-h-40 rounded border border-gray-200">
+                            </div>
+                            <label class="inline-flex items-center mb-2">
+                                <input type="checkbox" name="remove_option_image[{{ $i }}]" value="1" class="form-checkbox text-red-600" {{ old('remove_option_image.'.$i) ? 'checked' : '' }}>
+                                <span class="ml-2 text-sm text-gray-700">現在の画像を削除する</span>
+                            </label>
+                        @endif
+                        <input type="file" id="option_image_{{ $i }}" name="options[{{ $i }}][option_image]" accept="image/*" class="block w-full text-sm text-gray-700">
+                        @error('options.'.$i.'.option_image')
+                            <p class="text-red-500 text-xs italic">{{ $message }}</p>
+                        @enderror
+                    </div>
+                    <div class="mb-2">
                         <label class="inline-flex items-center">
                             <input type="checkbox" name="correct_options[{{ $i }}]" value="1" class="form-checkbox text-blue-600" {{ old('correct_options.'.$i, $option->is_correct) ? 'checked' : '' }}>
                             <span class="ml-2 text-gray-700">正解</span>
@@ -105,6 +138,13 @@
                         <label for="option_text_{{ $i }}" class="block text-gray-700 text-sm font-bold mb-1">内容:</label>
                         <input type="text" id="option_text_{{ $i }}" name="options[{{ $i }}][option_text]" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline @error('options.'.$i.'.option_text') border-red-500 @enderror" value="{{ old('options.'.$i.'.option_text') }}">
                         @error('options.'.$i.'.option_text')
+                            <p class="text-red-500 text-xs italic">{{ $message }}</p>
+                        @enderror
+                    </div>
+                    <div class="mb-2">
+                        <label for="option_image_{{ $i }}" class="block text-gray-700 text-sm font-bold mb-1">画像 (任意):</label>
+                        <input type="file" id="option_image_{{ $i }}" name="options[{{ $i }}][option_image]" accept="image/*" class="block w-full text-sm text-gray-700">
+                        @error('options.'.$i.'.option_image')
                             <p class="text-red-500 text-xs italic">{{ $message }}</p>
                         @enderror
                     </div>

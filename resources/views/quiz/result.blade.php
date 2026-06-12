@@ -34,6 +34,16 @@
         @endif
 
         <div class="mb-6">
+            <div class="mb-4 rounded border border-gray-200 bg-white p-4">
+                <p class="text-base font-semibold text-gray-800">問題:</p>
+                <p class="mt-2 text-gray-800 leading-relaxed">{!! nl2br(e($question->question_text)) !!}</p>
+                @if ($question->question_image_path)
+                    <div class="mt-3">
+                        <img src="{{ asset('storage/' . $question->question_image_path) }}" alt="問題画像" class="max-h-80 rounded-md border border-gray-200">
+                    </div>
+                @endif
+            </div>
+
             <p class="text-lg font-semibold mb-4">選択肢の詳細と解説:</p>
             <div class="space-y-4">
                 @foreach ($question_options as $option)
@@ -61,6 +71,11 @@
                                 <span class="ml-2 px-2 py-1 bg-blue-500 text-white text-xs rounded-full">あなたが選択</span>
                             @endif
                         </p>
+                        @if ($option->option_image_path)
+                            <div class="mt-2">
+                                <img src="{{ asset('storage/' . $option->option_image_path) }}" alt="選択肢画像" class="max-h-48 rounded-md border border-gray-200">
+                            </div>
+                        @endif
                         @if ($option->option_explanation)
                             <p class="text-sm text-gray-700 mt-2">解説: {!! nl2br(e($option->option_explanation)) !!}</p>
                         @endif

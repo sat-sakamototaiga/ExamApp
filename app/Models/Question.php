@@ -15,6 +15,7 @@ class Question extends Model {
         'exam_id',
         'created_by',
         'question_text',
+        'question_image_path',
         'difficulty',
         'overall_explanation', // 変更
     ];
