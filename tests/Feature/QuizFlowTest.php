@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Exam;
 use App\Models\Option;
+use App\Models\PointHistory;
 use App\Models\Question;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -176,5 +177,66 @@ class QuizFlowTest extends TestCase
         $this->actingAs($user)
             ->get(route('dashboard'))
             ->assertRedirect(route('quiz.resume', ['exam' => $exam->id]));
+    }
+
+    public function test_student_answer_records_point_history_for_correct_answer_and_perfect_bonus(): void
+    {
+        $teacher = User::factory()->create([
+            'role' => User::ROLE_TEACHER,
+        ]);
+
+        $student = User::factory()->create([
+            'role' => User::ROLE_STUDENT,
+            'total_points' => 0,
+        ]);
+
+        $exam = Exam::create(['name' => '試験E']);
+
+        $question = Question::create([
+            'exam_id' => $exam->id,
+            'created_by' => $teacher->id,
+            'question_text' => '問題E',
+            'difficulty' => Question::DIFFICULTY_NORMAL,
+        ]);
+
+        $correct = Option::create([
+            'question_id' => $question->id,
+            'option_text' => '正解',
+            'is_correct' => true,
+        ]);
+
+        $this->actingAs($student)
+            ->get(route('quiz.index', ['exam' => $exam->id, 'mode' => 'normal']))
+            ->assertOk();
+
+        $questionId = (int) session('quiz_state.current_question_id');
+
+        $this->actingAs($student)
+            ->post(route('quiz.answer', $exam), [
+                'question_id' => $questionId,
+                'selected_options' => [$correct->id],
+            ])
+            ->assertOk()
+            ->assertViewHas('is_finished', true);
+
+        $this->assertSame(13, (int) $student->fresh()->total_points);
+
+        $this->assertDatabaseHas('point_histories', [
+            'user_id' => $student->id,
+            'teacher_id' => $teacher->id,
+            'question_id' => $question->id,
+            'exam_id' => $exam->id,
+            'event_type' => PointHistory::EVENT_QUESTION_CORRECT,
+            'points_delta' => 3,
+        ]);
+
+        $this->assertDatabaseHas('point_histories', [
+            'user_id' => $student->id,
+            'teacher_id' => $teacher->id,
+            'question_id' => null,
+            'exam_id' => $exam->id,
+            'event_type' => PointHistory::EVENT_PERFECT_BONUS,
+            'points_delta' => 10,
+        ]);
     }
 }

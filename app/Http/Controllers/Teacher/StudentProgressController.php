@@ -3,9 +3,11 @@
 namespace App\Http\Controllers\Teacher;
 
 use App\Http\Controllers\Controller;
+use App\Models\PointHistory;
 use App\Models\PointResetSetting;
 use App\Models\TeacherFeedbackComment;
 use App\Models\User;
+use App\Support\PointService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -13,12 +15,18 @@ use Illuminate\View\View;
 
 class StudentProgressController extends Controller
 {
+    public function __construct(private PointService $pointService)
+    {
+    }
+
     public function index(Request $request): View
     {
         $teacher = $request->user();
         $this->applyAutomaticPointResetIfDue($teacher);
 
-        $pointResetSetting = PointResetSetting::query()->first();
+        $pointResetSetting = PointResetSetting::query()
+            ->where('teacher_id', $teacher->id)
+            ->first();
 
         $assignedStudentIds = $teacher->students()->pluck('users.id');
         // 担当生徒ごとの最新フィードバック日時を抽出してリマインド判定に使う。
@@ -89,7 +97,9 @@ class StudentProgressController extends Controller
             'reset_interval_days' => 'nullable|integer|min:1|max:365',
         ]);
 
-        $setting = PointResetSetting::query()->first() ?? new PointResetSetting();
+        $setting = PointResetSetting::query()->firstOrNew([
+            'teacher_id' => $teacher->id,
+        ]);
         $setting->reset_interval_days = $validated['reset_interval_days'] ?? null;
         $setting->updated_by = $teacher->id;
 
@@ -108,24 +118,23 @@ class StudentProgressController extends Controller
     public function resetAllStudentPoints(Request $request): RedirectResponse
     {
         $teacher = $request->user();
+        $assignedStudents = $teacher->students()->select('users.id')->get();
 
-        DB::transaction(function () use ($teacher) {
-            User::query()
-                ->where('role', User::ROLE_STUDENT)
-                ->update([
-                    'total_points' => 0,
-                    'points_reset_at' => now(),
-                    'updated_at' => now(),
-                ]);
+        $resetCount = $this->pointService->resetPointsForTeacherStudents(
+            teacher: $teacher,
+            students: $assignedStudents,
+            eventType: PointHistory::EVENT_MANUAL_RESET
+        );
 
-            $setting = PointResetSetting::query()->first() ?? new PointResetSetting();
-            $setting->last_reset_at = now();
-            $setting->updated_by = $teacher->id;
-            $setting->save();
-        });
+        $setting = PointResetSetting::query()->firstOrNew([
+            'teacher_id' => $teacher->id,
+        ]);
+        $setting->last_reset_at = now();
+        $setting->updated_by = $teacher->id;
+        $setting->save();
 
         return back()
-            ->with('success', '全生徒のポイントをリセットしました。')
+            ->with('success', "担当生徒のポイントをリセットしました（{$resetCount}名）。")
             // ダッシュボード側で完了ポップアップを表示するためのフラグ。
             ->with('completed_action', 'points_reset');
     }
@@ -155,7 +164,9 @@ class StudentProgressController extends Controller
 
     private function applyAutomaticPointResetIfDue(User $teacher): void
     {
-        $setting = PointResetSetting::query()->first();
+        $setting = PointResetSetting::query()
+            ->where('teacher_id', $teacher->id)
+            ->first();
 
         if (! $setting || $setting->reset_interval_days === null) {
             return;
@@ -175,18 +186,16 @@ class StudentProgressController extends Controller
             return;
         }
 
-        DB::transaction(function () use ($setting, $teacher) {
-            User::query()
-                ->where('role', User::ROLE_STUDENT)
-                ->update([
-                    'total_points' => 0,
-                    'points_reset_at' => now(),
-                    'updated_at' => now(),
-                ]);
+        $assignedStudents = $teacher->students()->select('users.id')->get();
 
-            $setting->last_reset_at = now();
-            $setting->updated_by = $teacher->id;
-            $setting->save();
-        });
+        $this->pointService->resetPointsForTeacherStudents(
+            teacher: $teacher,
+            students: $assignedStudents,
+            eventType: PointHistory::EVENT_AUTO_RESET
+        );
+
+        $setting->last_reset_at = now();
+        $setting->updated_by = $teacher->id;
+        $setting->save();
     }
 }

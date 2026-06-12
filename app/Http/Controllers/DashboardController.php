@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Question;
+use App\Models\PointHistory;
 use App\Models\PointResetSetting;
 use App\Models\TeacherFeedbackComment;
 use App\Models\User;
@@ -86,6 +87,11 @@ class DashboardController extends Controller
                 ->where('teacher_id', $user->id)
                 ->groupBy('student_id');
 
+            $subjectPointSummary = DB::table('point_histories')
+                ->select('user_id', DB::raw('SUM(points_delta) as subject_points'))
+                ->where('teacher_id', $user->id)
+                ->groupBy('user_id');
+
             // 担当生徒ごとのポイント順位と最終フィードバック日時を同時に取得する。
             $assignedStudents = User::query()
                 ->whereIn('users.id', $assignedStudentIds)
@@ -95,15 +101,20 @@ class DashboardController extends Controller
                 ->leftJoinSub($latestFeedbackSummary, 'latest_feedback_summary', function ($join) {
                     $join->on('users.id', '=', 'latest_feedback_summary.student_id');
                 })
+                ->leftJoinSub($subjectPointSummary, 'subject_point_summary', function ($join) {
+                    $join->on('users.id', '=', 'subject_point_summary.user_id');
+                })
                 ->select(
                     'users.id',
                     'users.name',
                     'users.email',
                     'users.total_points',
+                    DB::raw('COALESCE(subject_point_summary.subject_points, 0) as subject_points'),
                     DB::raw('COALESCE(result_summary.total_score, 0) as total_score'),
                     DB::raw('COALESCE(result_summary.total_questions, 0) as total_questions'),
                     DB::raw('latest_feedback_summary.last_feedback_at as last_feedback_at')
                 )
+                ->orderByDesc('subject_points')
                 ->orderByDesc('users.total_points')
                 ->orderBy('users.name')
                 ->get();
@@ -128,7 +139,10 @@ class DashboardController extends Controller
                 'lowAccuracyQuestions' => $lowAccuracyQuestions,
                 'assignedStudents' => $assignedStudents,
                 'studentsWithoutRecentFeedback' => $studentsWithoutRecentFeedback,
-                'pointResetSetting' => PointResetSetting::query()->first(),
+                'teacherSubjectName' => $user->subject_name,
+                'pointResetSetting' => PointResetSetting::query()
+                    ->where('teacher_id', $user->id)
+                    ->first(),
             ];
         }
 
@@ -153,26 +167,47 @@ class DashboardController extends Controller
             $globalRankingDisplayStudents = $this->selectRankingDisplayStudents($globalRankingStudents, $user->id);
 
             $teacherRankings = $user->teachers()
-                ->select('users.id', 'users.name')
+                ->select('users.id', 'users.name', 'users.subject_name')
                 ->orderBy('users.name')
                 ->get()
                 ->map(function (User $teacher) use ($user) {
+                    $subjectPointSummary = DB::table('point_histories')
+                        ->select('user_id', DB::raw('SUM(points_delta) as subject_points'))
+                        ->where('teacher_id', $teacher->id)
+                        ->groupBy('user_id');
+
                     $rankedStudents = $this->rankStudentsByPoints(
                         $teacher->students()
-                            ->select('users.id', 'users.name', 'users.total_points')
-                            ->orderByDesc('users.total_points')
+                            ->leftJoinSub($subjectPointSummary, 'subject_point_summary', function ($join) {
+                                $join->on('users.id', '=', 'subject_point_summary.user_id');
+                            })
+                            ->select('users.id', 'users.name', DB::raw('COALESCE(subject_point_summary.subject_points, 0) as total_points'))
+                            ->orderByDesc('total_points')
                             ->orderBy('users.name')
                             ->get()
                     );
 
                     return [
                         'teacher' => $teacher,
+                        'subjectName' => $teacher->subject_name,
                         'students' => $rankedStudents,
+                        'studentCount' => $rankedStudents->count(),
                         'displayStudents' => $this->selectRankingDisplayStudents($rankedStudents, $user->id),
                         'currentStudentRank' => $rankedStudents->firstWhere('id', $user->id)?->point_rank,
                     ];
                 })
                 ->values();
+
+            $recentPointHistories = PointHistory::query()
+                ->where('user_id', $user->id)
+                ->with([
+                    'teacher:id,name,subject_name',
+                    'question:id,question_text',
+                    'exam:id,name',
+                ])
+                ->orderByDesc('id')
+                ->limit(10)
+                ->get();
 
             $pointRank = $globalRankingStudents
                 ->firstWhere('id', $user->id)
@@ -216,6 +251,7 @@ class DashboardController extends Controller
                 'pointRank' => $pointRank,
                 'weakQuestions' => $questionPool->shuffle()->take(3)->values(),
                 'teacherRankings' => $teacherRankings,
+                'recentPointHistories' => $recentPointHistories,
                 'globalRankingStudents' => $globalRankingStudents,
                 'globalRankingDisplayStudents' => $globalRankingDisplayStudents,
             ];

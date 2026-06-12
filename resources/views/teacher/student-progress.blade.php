@@ -53,9 +53,9 @@
                 </div>
             </form>
 
-            <form action="{{ route('teacher.students.points.reset') }}" method="POST" class="mt-3" onsubmit="return confirm('全生徒のポイントを0にリセットします。よろしいですか？');">
+            <form action="{{ route('teacher.students.points.reset') }}" method="POST" class="mt-3" onsubmit="return confirm('担当生徒のこの教科ポイントを0にリセットします。よろしいですか？');">
                 @csrf
-                <button type="submit" class="rounded bg-red-600 px-4 py-2 text-white hover:bg-red-700">全生徒のポイントを手動リセット</button>
+                <button type="submit" class="rounded bg-red-600 px-4 py-2 text-white hover:bg-red-700">担当生徒の教科ポイントを手動リセット</button>
             </form>
         </div>
 
