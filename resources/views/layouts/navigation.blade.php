@@ -13,9 +13,38 @@
                 <!-- Navigation Links -->
                 <div class="hidden space-x-8 sm:-my-px sm:ms-10 sm:flex">
                     @auth
-                        <x-nav-link :href="route('dashboard')" :active="request()->routeIs('dashboard')">
-                            {{ __('Dashboard') }}
+                        @php($user = Auth::user())
+
+                        <x-nav-link :href="route('quiz.select_exam')" :active="request()->routeIs('quiz.*')">
+                            試験開始
                         </x-nav-link>
+
+                        @if ($user->isStudent())
+                            <x-nav-link :href="route('dashboard.feedback-history')" :active="request()->routeIs('dashboard.feedback-history')">
+                                FB履歴
+                            </x-nav-link>
+                        @endif
+
+                        @if ($user->hasRoleLevel(\App\Models\User::ROLE_TEACHER))
+                            <x-nav-link :href="route('questions.index')" :active="request()->routeIs('questions.*')">
+                                問題管理
+                            </x-nav-link>
+                            <x-nav-link :href="route('exams.index')" :active="request()->routeIs('exams.*')">
+                                試験管理
+                            </x-nav-link>
+                        @endif
+
+                        @if ($user->isTeacher())
+                            <x-nav-link :href="route('teacher.students.progress')" :active="request()->routeIs('teacher.students.*')">
+                                担当生徒の進捗
+                            </x-nav-link>
+                        @endif
+
+                        @if ($user->isAdmin())
+                            <x-nav-link :href="route('admin.users.index')" :active="request()->routeIs('admin.*')">
+                                ユーザー管理
+                            </x-nav-link>
+                        @endif
                     @else
                         <x-nav-link :href="route('login')" :active="request()->routeIs('login')">
                             ログイン
@@ -93,9 +122,38 @@
     <div :class="{'block': open, 'hidden': ! open}" class="hidden sm:hidden">
         <div class="pt-2 pb-3 space-y-1">
             @auth
-                <x-responsive-nav-link :href="route('dashboard')" :active="request()->routeIs('dashboard')">
-                    {{ __('Dashboard') }}
+                @php($user = Auth::user())
+
+                <x-responsive-nav-link :href="route('quiz.select_exam')" :active="request()->routeIs('quiz.*')">
+                    試験開始
                 </x-responsive-nav-link>
+
+                @if ($user->isStudent())
+                    <x-responsive-nav-link :href="route('dashboard.feedback-history')" :active="request()->routeIs('dashboard.feedback-history')">
+                        FB履歴
+                    </x-responsive-nav-link>
+                @endif
+
+                @if ($user->hasRoleLevel(\App\Models\User::ROLE_TEACHER))
+                    <x-responsive-nav-link :href="route('questions.index')" :active="request()->routeIs('questions.*')">
+                        問題管理
+                    </x-responsive-nav-link>
+                    <x-responsive-nav-link :href="route('exams.index')" :active="request()->routeIs('exams.*')">
+                        試験管理
+                    </x-responsive-nav-link>
+                @endif
+
+                @if ($user->isTeacher())
+                    <x-responsive-nav-link :href="route('teacher.students.progress')" :active="request()->routeIs('teacher.students.*')">
+                        担当生徒の進捗
+                    </x-responsive-nav-link>
+                @endif
+
+                @if ($user->isAdmin())
+                    <x-responsive-nav-link :href="route('admin.users.index')" :active="request()->routeIs('admin.*')">
+                        ユーザー管理
+                    </x-responsive-nav-link>
+                @endif
             @else
                 <x-responsive-nav-link :href="route('login')" :active="request()->routeIs('login')">
                     ログイン

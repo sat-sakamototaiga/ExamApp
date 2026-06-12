@@ -14,7 +14,15 @@
     </head>
     <body class="font-sans antialiased">
         <div class="min-h-screen bg-gray-100">
-            @include('layouts.navigation')
+            @php
+                $shouldHideStudentHeader = auth()->check()
+                    && auth()->user()->isStudent()
+                    && request()->routeIs('quiz.index', 'quiz.resume', 'quiz.next', 'quiz.answer');
+            @endphp
+
+            @if (! $shouldHideStudentHeader)
+                @include('layouts.navigation')
+            @endif
 
             @if (isset($header))
                 <header class="bg-white shadow">
