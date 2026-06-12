@@ -7,6 +7,7 @@ use App\Models\QuestionAnswerLog;
 use App\Models\Exam;
 use App\Models\ExamResult;
 use App\Models\User;
+use App\Support\PointService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Session;
 
@@ -23,6 +24,10 @@ class QuizController extends Controller
         Question::DIFFICULTY_NORMAL => 3,
         Question::DIFFICULTY_EXPERT => 5,
     ];
+
+    public function __construct(private PointService $pointService)
+    {
+    }
 
     /**
      * 試験選択画面を表示
@@ -192,7 +197,7 @@ class QuizController extends Controller
             $awardedQuestionPoints = $this->resolvePointsForDifficulty((string) $question->difficulty);
 
             if ($request->user()?->isStudent() && $awardedQuestionPoints > 0) {
-                $request->user()->increment('total_points', $awardedQuestionPoints);
+                $this->pointService->awardQuestionPoints($request->user(), $question, $awardedQuestionPoints);
             }
         }
 
@@ -214,7 +219,13 @@ class QuizController extends Controller
             $bonusPointsAwarded = self::PERFECT_BONUS_POINTS;
 
             if ($request->user()?->isStudent()) {
-                $request->user()->increment('total_points', $bonusPointsAwarded);
+                $bonusTeacherId = $this->resolveBonusTeacherId($state['pool_question_ids'] ?? []);
+                $this->pointService->awardBonusPoints(
+                    student: $request->user(),
+                    points: $bonusPointsAwarded,
+                    teacherId: $bonusTeacherId,
+                    examId: $exam->id
+                );
             }
 
             ExamResult::create([
@@ -266,6 +277,30 @@ class QuizController extends Controller
         return $difficulties
             ->map(fn ($difficulty) => $this->resolvePointsForDifficulty((string) $difficulty))
             ->sum();
+    }
+
+    private function resolveBonusTeacherId(array $questionIds): ?int
+    {
+        if (empty($questionIds)) {
+            return null;
+        }
+
+        $creatorIds = Question::query()
+            ->whereIn('id', array_map('intval', $questionIds))
+            ->pluck('created_by')
+            ->filter(fn ($id) => $id !== null)
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values();
+
+        if ($creatorIds->count() !== 1) {
+            return null;
+        }
+
+        $teacherId = (int) $creatorIds->first();
+        $isTeacher = User::query()->whereKey($teacherId)->where('role', User::ROLE_TEACHER)->exists();
+
+        return $isTeacher ? $teacherId : null;
     }
 
     private function buildPoolQuestionIds(Exam $exam, string $mode, int $requestedCount, ?User $user): array

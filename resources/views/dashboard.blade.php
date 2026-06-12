@@ -106,7 +106,7 @@
                     <div x-show="showResetModal" class="fixed inset-0 z-50 flex items-center justify-center p-4" style="display: none;">
                         <div class="w-full max-w-md rounded-lg bg-white p-6 shadow-xl" @click.stop>
                             <h3 class="text-lg font-bold text-gray-900">ポイントリセット確認</h3>
-                            <p class="mt-2 text-sm text-gray-700">全生徒のポイントを0にリセットします。この操作は取り消せません。</p>
+                            <p class="mt-2 text-sm text-gray-700">担当生徒について、この教科で獲得したポイントを0にリセットします。この操作は取り消せません。</p>
 
                             <form action="{{ route('teacher.students.points.reset') }}" method="POST" class="mt-5 flex justify-end gap-3">
                                 @csrf
@@ -153,7 +153,7 @@
 
                     {{-- 要件: リセット完了後のみ短時間ポップアップを表示する。 --}}
                     <div x-show="showDonePopup" class="fixed right-4 top-4 z-50 rounded-lg border border-green-300 bg-green-50 px-4 py-3 text-sm text-green-800 shadow" style="display: none;">
-                        ポイントリセットが完了しました。
+                        担当生徒の教科ポイントをリセットしました。
                     </div>
 
                 <div class="mb-6 bg-white overflow-hidden shadow-sm sm:rounded-lg">
@@ -215,8 +215,10 @@
 
                 <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
                     <div class="p-6 text-gray-900">
-                        <h3 class="text-lg font-bold text-gray-900">担当生徒ポイントランキング</h3>
-                        <p class="mt-1 text-sm text-gray-600">担当生徒の累計ポイント順です。進捗画面へ移動して詳細を確認できます。</p>
+                        <h3 class="text-lg font-bold text-gray-900">教科別ポイントランキング（担当生徒）</h3>
+                        <p class="mt-1 text-sm text-gray-600">
+                            {{ $teacherDashboard['teacherSubjectName'] ? $teacherDashboard['teacherSubjectName'] : '未設定教科' }} の獲得ポイント順です。進捗画面へ移動して詳細を確認できます。
+                        </p>
 
                         <div class="mt-4 overflow-x-auto">
                             <table class="min-w-full border border-gray-200">
@@ -224,6 +226,7 @@
                                     <tr class="bg-gray-50">
                                         <th class="border-b px-3 py-2 text-right text-sm">順位</th>
                                         <th class="border-b px-3 py-2 text-left text-sm">生徒名</th>
+                                        <th class="border-b px-3 py-2 text-right text-sm">教科ポイント</th>
                                         <th class="border-b px-3 py-2 text-right text-sm">累計ポイント</th>
                                         <th class="border-b px-3 py-2 text-right text-sm">正答率</th>
                                         <th class="border-b px-3 py-2 text-left text-sm">最終FB</th>
@@ -235,6 +238,7 @@
                                         <tr class="{{ $student->feedback_overdue ? 'bg-red-50' : '' }}">
                                             <td class="border-b px-3 py-2 text-right text-sm">{{ $index + 1 }}</td>
                                             <td class="border-b px-3 py-2 text-sm">{{ $student->name }}</td>
+                                            <td class="border-b px-3 py-2 text-right text-sm">{{ (int) $student->subject_points }} pt</td>
                                             <td class="border-b px-3 py-2 text-right text-sm">{{ (int) $student->total_points }} pt</td>
                                             <td class="border-b px-3 py-2 text-right text-sm">{{ $student->accuracy_rate !== null ? $student->accuracy_rate . '%' : 'データなし' }}</td>
                                             <td class="border-b px-3 py-2 text-sm {{ $student->feedback_overdue ? 'text-red-700 font-semibold' : 'text-gray-600' }}">
@@ -246,7 +250,7 @@
                                         </tr>
                                     @empty
                                         <tr>
-                                            <td colspan="6" class="px-3 py-4 text-center text-sm text-gray-500">担当生徒がまだ設定されていません。</td>
+                                            <td colspan="7" class="px-3 py-4 text-center text-sm text-gray-500">担当生徒がまだ設定されていません。</td>
                                         </tr>
                                     @endforelse
                                 </tbody>
@@ -297,7 +301,45 @@
                                     <div class="mt-1 text-2xl font-bold text-gray-900">{{ $studentDashboard['pointRank'] !== null ? $studentDashboard['pointRank'] : '-' }} 位</div>
                                 </div>
                             </div>
-                            <p class="mt-2 text-xs text-gray-600">担任ごとの順位は下部の教科別ポイントランキングで確認できます。</p>
+                            <p class="mt-2 text-xs text-gray-600">担任ごとの教科ポイント順位は下部の教科別ポイントランキングで確認できます。</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-6 bg-white overflow-hidden shadow-sm sm:rounded-lg">
+                    <div class="p-6 text-gray-900">
+                        <h3 class="text-lg font-bold text-gray-900">ポイント獲得履歴（最新10件）</h3>
+                        <p class="mt-1 text-sm text-gray-600">どの問題でポイントを獲得したか、またはリセットされたかを確認できます。</p>
+
+                        <div class="mt-4 overflow-x-auto">
+                            <table class="min-w-full border border-gray-200">
+                                <thead>
+                                    <tr class="bg-gray-50">
+                                        <th class="border-b px-3 py-2 text-left text-sm">日時</th>
+                                        <th class="border-b px-3 py-2 text-left text-sm">種別</th>
+                                        <th class="border-b px-3 py-2 text-left text-sm">教科/担任</th>
+                                        <th class="border-b px-3 py-2 text-left text-sm">問題</th>
+                                        <th class="border-b px-3 py-2 text-right text-sm">増減</th>
+                                        <th class="border-b px-3 py-2 text-right text-sm">反映後残高</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @forelse ($studentDashboard['recentPointHistories'] as $pointHistory)
+                                        <tr>
+                                            <td class="border-b px-3 py-2 text-sm">{{ $pointHistory->created_at->format('Y-m-d H:i') }}</td>
+                                            <td class="border-b px-3 py-2 text-sm">{{ $pointHistory->event_type }}</td>
+                                            <td class="border-b px-3 py-2 text-sm">{{ $pointHistory->teacher?->subject_name ?? '-' }} / {{ $pointHistory->teacher?->name ?? '-' }}</td>
+                                            <td class="border-b px-3 py-2 text-sm">{{ $pointHistory->question?->id ? 'ID:' . $pointHistory->question->id : '-' }}</td>
+                                            <td class="border-b px-3 py-2 text-right text-sm {{ $pointHistory->points_delta >= 0 ? 'text-emerald-700' : 'text-red-700' }}">{{ $pointHistory->points_delta >= 0 ? '+' : '' }}{{ (int) $pointHistory->points_delta }}</td>
+                                            <td class="border-b px-3 py-2 text-right text-sm">{{ (int) $pointHistory->balance_after }} pt</td>
+                                        </tr>
+                                    @empty
+                                        <tr>
+                                            <td colspan="6" class="px-3 py-4 text-center text-sm text-gray-500">履歴データがありません。</td>
+                                        </tr>
+                                    @endforelse
+                                </tbody>
+                            </table>
                         </div>
                     </div>
                 </div>
@@ -379,7 +421,12 @@
                         <div class="mt-4 space-y-6">
                             @forelse ($studentDashboard['teacherRankings'] as $teacherRanking)
                                 <div>
-                                    <h4 class="text-base font-semibold text-gray-800">{{ $teacherRanking['teacher']->name }} 先生の受け持ち（教科名は今後対応）</h4>
+                                    <h4 class="text-base font-semibold text-gray-800">
+                                        {{ $teacherRanking['subjectName'] ?? '未設定教科' }} / {{ $teacherRanking['teacher']->name }} 先生
+                                    </h4>
+                                    <p class="mt-1 text-xs text-gray-600">
+                                        {{ $teacherRanking['studentCount'] }}名中 {{ $teacherRanking['currentStudentRank'] ?? '-' }}位
+                                    </p>
 
                                     <div class="mt-2 overflow-x-auto">
                                         <table class="min-w-full border border-gray-200">

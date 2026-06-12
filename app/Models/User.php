@@ -100,6 +100,14 @@ class User extends Authenticatable {
         return $this->hasMany(TeacherFeedbackComment::class, 'student_id');
     }
 
+    public function pointHistories(): HasMany {
+        return $this->hasMany(PointHistory::class);
+    }
+
+    public function resetPointSettings(): HasMany {
+        return $this->hasMany(PointResetSetting::class, 'teacher_id');
+    }
+
     public function hasRoleLevel(string $requiredRole): bool {
         $currentLevel = self::ROLE_LEVELS[$this->role] ?? 0;
         $requiredLevel = self::ROLE_LEVELS[$requiredRole] ?? PHP_INT_MAX;

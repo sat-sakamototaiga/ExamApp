@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\PointHistory;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -43,10 +44,47 @@ class StudentDashboardTest extends TestCase
         $mathTeacher->students()->attach([$student->id, $mathTopStudent->id, $commonStudent->id]);
         $englishTeacher->students()->attach([$student->id, $commonStudent->id]);
 
+        PointHistory::create([
+            'user_id' => $student->id,
+            'teacher_id' => $mathTeacher->id,
+            'event_type' => PointHistory::EVENT_QUESTION_CORRECT,
+            'points_delta' => 30,
+            'balance_after' => 80,
+        ]);
+        PointHistory::create([
+            'user_id' => $mathTopStudent->id,
+            'teacher_id' => $mathTeacher->id,
+            'event_type' => PointHistory::EVENT_QUESTION_CORRECT,
+            'points_delta' => 50,
+            'balance_after' => 100,
+        ]);
+        PointHistory::create([
+            'user_id' => $commonStudent->id,
+            'teacher_id' => $mathTeacher->id,
+            'event_type' => PointHistory::EVENT_QUESTION_CORRECT,
+            'points_delta' => 10,
+            'balance_after' => 60,
+        ]);
+
+        PointHistory::create([
+            'user_id' => $student->id,
+            'teacher_id' => $englishTeacher->id,
+            'event_type' => PointHistory::EVENT_QUESTION_CORRECT,
+            'points_delta' => 40,
+            'balance_after' => 80,
+        ]);
+        PointHistory::create([
+            'user_id' => $commonStudent->id,
+            'teacher_id' => $englishTeacher->id,
+            'event_type' => PointHistory::EVENT_QUESTION_CORRECT,
+            'points_delta' => 20,
+            'balance_after' => 60,
+        ]);
+
         $response = $this->actingAs($student)->get(route('dashboard'));
 
         $response->assertOk();
-        $response->assertSee('生徒ダッシュボード');
+        $response->assertSee('自分の所持ポイント');
         $response->assertSee('数学');
         $response->assertSee('英語');
         $response->assertSee('3名中 2位');

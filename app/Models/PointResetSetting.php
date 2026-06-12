@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class PointResetSetting extends Model
 {
     protected $fillable = [
+        'teacher_id',
         'reset_interval_days',
         'last_reset_at',
         'updated_by',
@@ -23,5 +24,10 @@ class PointResetSetting extends Model
     public function updater(): BelongsTo
     {
         return $this->belongsTo(User::class, 'updated_by');
+    }
+
+    public function teacher(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'teacher_id');
     }
 }

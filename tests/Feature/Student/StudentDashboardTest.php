@@ -127,8 +127,8 @@ class StudentDashboardTest extends TestCase
         $response->assertSee('正答率が低い問題（ランダム3問）');
         $response->assertSee('全生徒ポイントランキング');
         $response->assertSee('教科別ポイントランキング');
-        $response->assertSee('担任A 先生の受け持ち');
-        $response->assertSee('担任B 先生の受け持ち');
+        $response->assertSee('担任A 先生');
+        $response->assertSee('担任B 先生');
         $response->assertSee($outsideStudent->name);
         $response->assertSee($highRankStudent->name);
         $response->assertSee($lowRankStudent->name);
