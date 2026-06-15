@@ -14,6 +14,7 @@ use Illuminate\Support\Facades\Session;
 class QuizController extends Controller
 {
     private const QUIZ_STATE_KEY = 'quiz_state';
+    private const QUIZ_COMPLETION_KEY = 'quiz_completion';
     private const MODE_NORMAL = 'normal';
     private const MODE_FLAGGED = 'flagged';
     private const MODE_RANDOM_COUNT = 'random_count';
@@ -35,6 +36,7 @@ class QuizController extends Controller
     public function selectExam()
     {
         $this->clearQuizState();
+        $this->clearQuizCompletion();
 
         $exams = Exam::orderBy('name')->get(); // 全ての試験を取得
         return view('quiz.select_exam', compact('exams'));
@@ -49,7 +51,10 @@ class QuizController extends Controller
     {
         if ($this->isLikelyReloadRequest($request)) {
             $this->clearQuizState();
+            $this->clearQuizCompletion();
         }
+
+        $this->clearQuizCompletion();
 
         $validated = $request->validate([
             'mode' => 'nullable|in:normal,flagged,random_count',
@@ -213,10 +218,12 @@ class QuizController extends Controller
         $remainingCount = $this->remainingQuestionCount($state);
         $isFinished = $remainingCount === 0;
         $bonusPointsAwarded = 0;
+        $finalPointsEarned = 0;
 
         if ($isFinished && $is_correct) {
             $basePoints = $this->resolveTotalPointsForQuestions($state['pool_question_ids'] ?? []);
             $bonusPointsAwarded = self::PERFECT_BONUS_POINTS;
+            $finalPointsEarned = $basePoints + $bonusPointsAwarded;
 
             if ($request->user()?->isStudent()) {
                 $bonusTeacherId = $this->resolveBonusTeacherId($state['pool_question_ids'] ?? []);
@@ -233,9 +240,49 @@ class QuizController extends Controller
                 'exam_id' => $exam->id,
                 'score' => count($state['solved_question_ids'] ?? []),
                 'question_count' => count($state['pool_question_ids'] ?? []),
-                'points_earned' => $basePoints + $bonusPointsAwarded,
+                'points_earned' => $finalPointsEarned,
                 'bonus_points' => $bonusPointsAwarded,
             ]);
+        }
+
+        if ($isFinished) {
+            $score = count($state['solved_question_ids'] ?? []);
+            $questionCount = count($state['pool_question_ids'] ?? []);
+            $accuracyRate = $questionCount > 0
+                ? round(($score / $questionCount) * 100, 1)
+                : 0.0;
+
+            $poolQuestionIds = array_map('intval', $state['pool_question_ids'] ?? []);
+            $solvedQuestionIds = array_map('intval', $state['solved_question_ids'] ?? []);
+            $questionsById = Question::query()
+                ->whereIn('id', $poolQuestionIds)
+                ->pluck('question_text', 'id');
+
+            $questionOutcomes = collect($poolQuestionIds)
+                ->map(function (int $poolQuestionId) use ($questionsById, $solvedQuestionIds) {
+                    $isSolved = in_array($poolQuestionId, $solvedQuestionIds, true);
+
+                    return [
+                        'question_id' => $poolQuestionId,
+                        'question_text' => (string) ($questionsById[$poolQuestionId] ?? '問題文不明'),
+                        'is_correct' => $isSolved,
+                    ];
+                })
+                ->values()
+                ->all();
+
+            Session::put(self::QUIZ_COMPLETION_KEY, [
+                'user_id' => (int) $request->user()->id,
+                'exam_id' => (int) $exam->id,
+                'score' => $score,
+                'question_count' => $questionCount,
+                'accuracy_rate' => $accuracyRate,
+                'points_earned' => $finalPointsEarned,
+                'bonus_points' => $bonusPointsAwarded,
+                'question_outcomes' => $questionOutcomes,
+            ]);
+
+            $this->clearQuizState();
         }
 
         $data = [
@@ -257,6 +304,32 @@ class QuizController extends Controller
         ];
 
         return view('quiz.result', $data);
+    }
+
+    public function examResult(Request $request, Exam $exam)
+    {
+        $completion = Session::get(self::QUIZ_COMPLETION_KEY);
+
+        if (!is_array($completion)) {
+            return redirect()->route('quiz.select_exam')->with('error', '試験リザルトが見つかりません。');
+        }
+
+        $isSameUser = (int) ($completion['user_id'] ?? 0) === (int) $request->user()->id;
+        $isSameExam = (int) ($completion['exam_id'] ?? 0) === (int) $exam->id;
+
+        if (!$isSameUser || !$isSameExam) {
+            return redirect()->route('quiz.select_exam')->with('error', '試験リザルトを表示できません。');
+        }
+
+        return view('quiz.exam_result', [
+            'exam' => $exam,
+            'score' => (int) ($completion['score'] ?? 0),
+            'question_count' => (int) ($completion['question_count'] ?? 0),
+            'accuracy_rate' => (float) ($completion['accuracy_rate'] ?? 0),
+            'points_earned' => (int) ($completion['points_earned'] ?? 0),
+            'bonus_points' => (int) ($completion['bonus_points'] ?? 0),
+            'question_outcomes' => collect($completion['question_outcomes'] ?? []),
+        ]);
     }
 
     private function resolvePointsForDifficulty(string $difficulty): int
@@ -436,6 +509,11 @@ class QuizController extends Controller
     private function clearQuizState(): void
     {
         Session::forget(self::QUIZ_STATE_KEY);
+    }
+
+    private function clearQuizCompletion(): void
+    {
+        Session::forget(self::QUIZ_COMPLETION_KEY);
     }
 
     private function isLikelyReloadRequest(Request $request): bool

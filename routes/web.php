@@ -70,6 +70,7 @@ Route::middleware(['auth', 'quiz.prevent.random.navigation', 'quiz.reset.on.navi
     Route::get('/quiz', [QuizController::class, 'selectExam'])->name('quiz.select_exam');
     Route::get('/quiz/{exam}/resume', [QuizController::class, 'resume'])->name('quiz.resume');
     Route::get('/quiz/{exam}', [QuizController::class, 'index'])->name('quiz.index');
+    Route::get('/quiz/{exam}/result', [QuizController::class, 'examResult'])->name('quiz.exam_result');
     Route::post('/quiz/{exam}/next', [QuizController::class, 'next'])->name('quiz.next');
     Route::post('/quiz/{exam}/answer', [QuizController::class, 'answer'])->name('quiz.answer');
 

@@ -71,7 +71,15 @@ class QuizFlowTest extends TestCase
                 'selected_options' => [$secondCorrectOptionId],
             ])
             ->assertOk()
+            ->assertViewIs('quiz.result')
             ->assertViewHas('is_finished', true);
+
+        $this->actingAs($user)
+            ->get(route('quiz.exam_result', $exam))
+            ->assertOk()
+            ->assertViewIs('quiz.exam_result')
+            ->assertViewHas('score', 2)
+            ->assertViewHas('question_count', 2);
     }
 
     public function test_reload_starts_quiz_from_initial_state(): void
@@ -103,9 +111,10 @@ class QuizFlowTest extends TestCase
                 'selected_options' => [$correct->id],
             ])
             ->assertOk()
-            ->assertViewHas('is_correct', true);
+            ->assertViewIs('quiz.result')
+            ->assertViewHas('is_finished', true);
 
-        $this->assertCount(1, session('quiz_state.solved_question_ids', []));
+        $this->assertNull(session('quiz_state'));
 
         $this->actingAs($user)
             ->withHeaders(['Cache-Control' => 'max-age=0'])
@@ -217,7 +226,22 @@ class QuizFlowTest extends TestCase
                 'selected_options' => [$correct->id],
             ])
             ->assertOk()
+            ->assertViewIs('quiz.result')
             ->assertViewHas('is_finished', true);
+
+        $examResultResponse = $this->actingAs($student)
+            ->get(route('quiz.exam_result', $exam));
+
+        $examResultResponse
+            ->assertOk()
+            ->assertViewIs('quiz.exam_result')
+            ->assertViewHas('score', 1)
+            ->assertViewHas('question_count', 1);
+
+        $questionOutcomes = $examResultResponse->viewData('question_outcomes');
+        $this->assertCount(1, $questionOutcomes);
+        $this->assertSame('問題E', $questionOutcomes->first()['question_text']);
+        $this->assertTrue((bool) $questionOutcomes->first()['is_correct']);
 
         $this->assertSame(13, (int) $student->fresh()->total_points);
 

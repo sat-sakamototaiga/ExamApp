@@ -327,7 +327,7 @@
                                     @forelse ($studentDashboard['recentPointHistories'] as $pointHistory)
                                         <tr>
                                             <td class="border-b px-3 py-2 text-sm">{{ $pointHistory->created_at->format('Y-m-d H:i') }}</td>
-                                            <td class="border-b px-3 py-2 text-sm">{{ $pointHistory->event_type }}</td>
+                                            <td class="border-b px-3 py-2 text-sm">{{ $pointHistory->event_type_label }}</td>
                                             <td class="border-b px-3 py-2 text-sm">{{ $pointHistory->teacher?->subject_name ?? '-' }} / {{ $pointHistory->teacher?->name ?? '-' }}</td>
                                             <td class="border-b px-3 py-2 text-sm">{{ $pointHistory->question?->id ? 'ID:' . $pointHistory->question->id : '-' }}</td>
                                             <td class="border-b px-3 py-2 text-right text-sm {{ $pointHistory->points_delta >= 0 ? 'text-emerald-700' : 'text-red-700' }}">{{ $pointHistory->points_delta >= 0 ? '+' : '' }}{{ (int) $pointHistory->points_delta }}</td>
