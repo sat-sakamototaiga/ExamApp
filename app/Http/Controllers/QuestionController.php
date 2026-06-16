@@ -8,12 +8,15 @@ use App\Models\Exam;
 use App\Models\User;
 use App\Support\CsvImportService;
 use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB; // トランザクションのために追加
 use Illuminate\Support\Facades\Log; // デバッグ用にLogファサードを追加
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Exception; // Exceptionクラスをインポート
+use ZipArchive;
 
 class QuestionController extends Controller {
     /**
@@ -323,20 +326,21 @@ class QuestionController extends Controller {
         $this->authorizeQuestionManagement();
 
         $header = [
-            '問題文', '全体解説',
-            '選択肢1', '正解1', '解説1',
-            '選択肢2', '正解2', '解説2',
-            '選択肢3', '正解3', '解説3',
-            '選択肢4', '正解4', '解説4',
+            '問題文', '問題画像', '全体解説',
+            '選択肢1', '選択肢1画像', '正解1', '解説1',
+            '選択肢2', '選択肢2画像', '正解2', '解説2',
+            '選択肢3', '選択肢3画像', '正解3', '解説3',
+            '選択肢4', '選択肢4画像', '正解4', '解説4',
         ];
 
         $sampleRow = [
             'サンプル問題: 日本の首都はどこですか？',
+            'question_001.png',
             '日本の首都は東京です。',
-            '東京', '1', '日本の首都は東京です。',
-            '大阪', '0', '大阪は首都ではありません。',
-            '名古屋', '0', '名古屋は首都ではありません。',
-            '福岡', '0', '福岡は首都ではありません。',
+            '東京', 'choice_001_1.png', '1', '日本の首都は東京です。',
+            '大阪', '', '0', '大阪は首都ではありません。',
+            '名古屋', '', '0', '名古屋は首都ではありません。',
+            '福岡', '', '0', '福岡は首都ではありません。',
         ];
 
         return $csvImportService->streamTemplateDownload('questions_import_template.csv', $header, [$sampleRow]);
@@ -355,6 +359,7 @@ class QuestionController extends Controller {
         $request->validate([
             'csv_file' => 'required|file|mimes:csv,txt|max:2048', // 必須、ファイル形式はCSVまたはTXT、最大2MB
             'exam_id' => 'required|exists:exams,id', // どの試験にインポートするか (追加)
+            'images_zip' => 'nullable|file|mimes:zip|max:51200',
         ]);
 
         try {
@@ -365,6 +370,8 @@ class QuestionController extends Controller {
 
         $csvStream = $reader['stream'];
         $header = $reader['header'];
+        $zipArchive = null;
+        $zipEntries = [];
 
         $importedCount = 0; // インポート成功数
         $errorMessages = []; // エラーメッセージを格納する配列
@@ -372,7 +379,7 @@ class QuestionController extends Controller {
 
         // 期待されるCSVヘッダーの形式
         // 例: 問題文,全体解説,選択肢1,正解1,解説1,選択肢2,正解2,解説2,選択肢3,正解3,解説3,選択肢4,正解4,解説4
-        $expectedHeader = [
+        $legacyHeader = [
             '問題文', '全体解説',
             '選択肢1', '正解1', '解説1',
             '選択肢2', '正解2', '解説2',
@@ -380,12 +387,37 @@ class QuestionController extends Controller {
             '選択肢4', '正解4', '解説4',
         ];
 
+        $imageHeader = [
+            '問題文', '問題画像', '全体解説',
+            '選択肢1', '選択肢1画像', '正解1', '解説1',
+            '選択肢2', '選択肢2画像', '正解2', '解説2',
+            '選択肢3', '選択肢3画像', '正解3', '解説3',
+            '選択肢4', '選択肢4画像', '正解4', '解説4',
+        ];
+
+        $isLegacyImport = $header === $legacyHeader;
+        $isImageImport = $header === $imageHeader;
+
         // 3. CSVヘッダーの整合性チェック (簡易的なもの)
-        if ($header !== $expectedHeader) {
+        if (! $isLegacyImport && ! $isImageImport) {
             fclose($csvStream);
             return back()->withInput()->withErrors([
-                'CSVファイルのヘッダー形式が正しくありません。期待されるヘッダー: ' . implode(', ', $expectedHeader),
+                'CSVファイルのヘッダー形式が正しくありません。期待されるヘッダー(旧): '
+                . implode(', ', $legacyHeader)
+                . ' / 期待されるヘッダー(画像対応): '
+                . implode(', ', $imageHeader),
             ]);
+        }
+
+        if ($request->hasFile('images_zip')) {
+            try {
+                $zipArchive = $this->openZipArchive($request->file('images_zip'));
+                $zipEntries = $this->buildZipEntries($zipArchive);
+            } catch (Exception $e) {
+                fclose($csvStream);
+
+                return back()->withInput()->withErrors([$e->getMessage()]);
+            }
         }
 
         $selectedExamId = $request->input('exam_id'); // 選択された試験IDを取得
@@ -421,12 +453,28 @@ class QuestionController extends Controller {
 
             // データベーストランザクションを開始
             DB::beginTransaction();
+            $storedImagePaths = [];
             try {
+                $questionImagePath = null;
+                if ($isImageImport) {
+                    $questionImagePath = $this->storeImportedImageFromZip(
+                        $zipArchive,
+                        $zipEntries,
+                        $data['問題画像'] ?? null,
+                        'questions'
+                    );
+
+                    if ($questionImagePath) {
+                        $storedImagePaths[] = $questionImagePath;
+                    }
+                }
+
                 // 問題を作成
                 $question = Question::create([
                     'exam_id' => $selectedExamId, // 選択された試験IDを問題に紐付ける
                     'created_by' => $request->user()->id,
                     'question_text' => $data['問題文'],
+                    'question_image_path' => $questionImagePath,
                     'difficulty' => Question::DIFFICULTY_NORMAL,
                     'overall_explanation' => $data['全体解説'] ?? null, // '全体解説'がなければnull
                 ]);
@@ -437,10 +485,26 @@ class QuestionController extends Controller {
                     $optionText = $data["選択肢{$i}"] ?? null;
                     $isCorrect = (isset($data["正解{$i}"]) && $data["正解{$i}"] == '1'); // '正解X'が'1'ならtrue
                     $optionExplanation = $data["解説{$i}"] ?? null;
+                    $optionImageColumn = "選択肢{$i}画像";
 
                     if (!empty($optionText)) { // 選択肢のテキストが空でなければ保存
+                        $optionImagePath = null;
+                        if ($isImageImport) {
+                            $optionImagePath = $this->storeImportedImageFromZip(
+                                $zipArchive,
+                                $zipEntries,
+                                $data[$optionImageColumn] ?? null,
+                                'options'
+                            );
+
+                            if ($optionImagePath) {
+                                $storedImagePaths[] = $optionImagePath;
+                            }
+                        }
+
                         $question->options()->create([
                             'option_text' => $optionText,
+                            'option_image_path' => $optionImagePath,
                             'is_correct' => $isCorrect,
                             'option_explanation' => $optionExplanation,
                         ]);
@@ -459,12 +523,18 @@ class QuestionController extends Controller {
                 DB::commit(); // 全ての処理が成功したらコミット
             } catch (Exception $e) {
                 DB::rollBack(); // エラーが発生したらロールバック
+                foreach ($storedImagePaths as $storedImagePath) {
+                    $this->deleteImageFromPublicDisk($storedImagePath);
+                }
                 $errorMessages[] = "{$lineNumber}行目: インポート中にエラーが発生しました - " . $e->getMessage();
                 Log::error("CSV Import Error on line {$lineNumber}: " . $e->getMessage() . ' Data: ' . json_encode($data));
             }
         }
 
         fclose($csvStream);
+        if ($zipArchive instanceof ZipArchive) {
+            $zipArchive->close();
+        }
 
         // 5. 結果メッセージの表示
         if (count($errorMessages) > 0) {
@@ -510,5 +580,103 @@ class QuestionController extends Controller {
         if (Storage::disk('public')->exists($path)) {
             Storage::disk('public')->delete($path);
         }
+    }
+
+    private function openZipArchive(UploadedFile $zipFile): ZipArchive
+    {
+        $zipPath = $zipFile->getRealPath();
+        if ($zipPath === false) {
+            throw new Exception('画像ZIPファイルの読み込みに失敗しました。');
+        }
+
+        $zipArchive = new ZipArchive();
+        if ($zipArchive->open($zipPath) !== true) {
+            throw new Exception('画像ZIPファイルを開けませんでした。');
+        }
+
+        return $zipArchive;
+    }
+
+    /**
+     * @return array<string, int>
+     */
+    private function buildZipEntries(ZipArchive $zipArchive): array
+    {
+        $zipEntries = [];
+
+        for ($index = 0; $index < $zipArchive->numFiles; $index++) {
+            $stat = $zipArchive->statIndex($index);
+            $entryName = $stat['name'] ?? '';
+
+            if ($entryName === '' || str_ends_with($entryName, '/')) {
+                continue;
+            }
+
+            $baseName = basename($entryName);
+            if ($baseName !== $entryName) {
+                throw new Exception('画像ZIP内にサブフォルダは含められません。');
+            }
+
+            if (isset($zipEntries[$baseName])) {
+                throw new Exception("画像ZIP内で同名ファイルが重複しています: {$baseName}");
+            }
+
+            $zipEntries[$baseName] = $index;
+        }
+
+        return $zipEntries;
+    }
+
+    /**
+     * @param array<string, int> $zipEntries
+     */
+    private function storeImportedImageFromZip(?ZipArchive $zipArchive, array $zipEntries, ?string $fileName, string $directory): ?string
+    {
+        $fileName = trim((string) $fileName);
+        if ($fileName === '') {
+            return null;
+        }
+
+        if (str_contains($fileName, '/') || str_contains($fileName, '\\')) {
+            throw new Exception("不正な画像ファイル名です: {$fileName}");
+        }
+
+        if (! $zipArchive instanceof ZipArchive) {
+            throw new Exception("画像ファイル「{$fileName}」が指定されていますが、画像ZIPがアップロードされていません。");
+        }
+
+        if (! array_key_exists($fileName, $zipEntries)) {
+            throw new Exception("画像ファイル「{$fileName}」がZIP内に見つかりません。");
+        }
+
+        $imageData = $zipArchive->getFromIndex($zipEntries[$fileName]);
+        if ($imageData === false || $imageData === '') {
+            throw new Exception("画像ファイル「{$fileName}」の読み込みに失敗しました。");
+        }
+
+        if (strlen($imageData) > 5 * 1024 * 1024) {
+            throw new Exception("画像ファイル「{$fileName}」が5MBを超えています。");
+        }
+
+        if (@getimagesizefromstring($imageData) === false) {
+            throw new Exception("画像ファイル「{$fileName}」は有効な画像ではありません。");
+        }
+
+        $mimeType = (new \finfo(FILEINFO_MIME_TYPE))->buffer($imageData) ?: '';
+        $allowedMimeToExtension = [
+            'image/jpeg' => 'jpg',
+            'image/png' => 'png',
+            'image/webp' => 'webp',
+            'image/gif' => 'gif',
+        ];
+
+        if (! isset($allowedMimeToExtension[$mimeType])) {
+            throw new Exception("画像ファイル「{$fileName}」の形式がサポートされていません。");
+        }
+
+        $path = $directory . '/imports/' . Str::uuid() . '.' . $allowedMimeToExtension[$mimeType];
+        Storage::disk('public')->put($path, $imageData);
+
+        return $path;
     }
 }
